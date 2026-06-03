@@ -399,6 +399,75 @@ input:focus {
   }
 }
 
+/* Phone-scoped control slimming. The layout already stacks at 820px; this
+   narrower breakpoint reshapes the floating controls/modal so they stop eating
+   a small screen. Tablets keep the roomy centered bar. */
+@media (max-width: 560px) {
+  /* The centered floating bar becomes a slim full-width docked bar with side
+     gutters, so the fixed 280px message slot can't push it past the viewport. */
+  .overlay-bar {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    transform: none;
+    max-width: none;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  /* Desktop reveal bakes translate(-50%) into its keyframes — on phones the bar
+     isn't centered, so swap to a translateY-only entry to avoid a sideways jump. */
+  .overlay-bar--reveal {
+    animation: overlay-bar-in-mobile 0.4s ease both;
+  }
+
+  /* Drop the fixed width so the text wraps instead of forcing the bar wide. */
+  .overlay-bar-msg {
+    width: auto;
+    flex: 1;
+    min-height: 0;
+    font-size: 12px;
+    text-align: left;
+  }
+
+  /* Keep the confirm button a comfortable tap target, never collapsed. */
+  .overlay-bar button {
+    flex-shrink: 0;
+    min-height: 44px;
+  }
+
+  .overlay-top {
+    top: 10px;
+    left: 10px;
+    padding: 7px 11px;
+    font-size: 12px;
+    max-width: calc(100% - 20px);
+  }
+
+  .modal-backdrop {
+    padding: 14px;
+  }
+
+  .modal {
+    padding: 20px;
+  }
+
+  .modal .title {
+    font-size: 24px;
+  }
+}
+
+@keyframes overlay-bar-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .badge {
   font-family: var(--font-mono);
   font-size: 11px;

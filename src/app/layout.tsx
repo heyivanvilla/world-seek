@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Cutive_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -22,6 +22,11 @@ const mono = Cutive_Mono({
 export const metadata: Metadata = {
   title: "World Seek",
   description: "Hide somewhere in the world. Let your friends find you on Street View.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
