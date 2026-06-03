@@ -43,6 +43,29 @@ npm run build
 npm start
 ```
 
+## Deploy on Coolify (self-hosted)
+
+The repo ships a `Dockerfile` and `.dockerignore`, so deploying is "point Coolify at the repo".
+
+1. **DNS:** point an `A` record (e.g. `worldseek.yourdomain.com`) at your Coolify server IP.
+2. **Connect the repo:** Coolify → *Sources* → add a **GitHub App** (enables auto-deploy on
+   push) with access to this private repo.
+3. **New Resource → Application** → pick the repo + branch. **Build Pack: Dockerfile.**
+4. **Port:** set *Ports Exposes* to `3000`. **Domain:** set the FQDN (Coolify issues HTTPS via
+   Traefik, including `wss://` for the socket).
+5. **Environment variables:**
+   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — **mark as a Build Variable** (available at build time).
+     Next.js inlines it into the browser bundle during `next build`; if it's runtime-only,
+     Street View silently fails.
+   - `ALLOWED_ORIGIN` = your `https://...` domain (runtime; locks Socket.IO CORS).
+   - `PORT` = `3000` (optional).
+6. **Deploy.** Keep **replicas = 1** — game state is in-memory, so a second instance would split
+   rooms and break Socket.IO.
+
+**Secure the Maps key** in Google Cloud Console (it's public by design): add an HTTP-referrer
+restriction for your domain, restrict it to the **Maps JavaScript API**, and set a billing
+budget alert.
+
 ## How to play
 
 1. Open `http://localhost:3000`, enter a name, and **Start game**. You're the host (GM).

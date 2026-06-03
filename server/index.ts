@@ -16,8 +16,9 @@ app.prepare().then(() => {
   });
 
   const io = new Server(server, {
-    // Local dev only; widen/lock down as needed for deployment.
-    cors: { origin: "*" },
+    // Dev: allow any origin. Prod: lock to ALLOWED_ORIGIN (e.g. https://worldseek.example.com);
+    // falls back to same-origin reflection if unset.
+    cors: { origin: dev ? "*" : process.env.ALLOWED_ORIGIN || true },
   });
   registerHandlers(io);
 
