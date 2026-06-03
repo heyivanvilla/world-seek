@@ -1,0 +1,215 @@
+import {
+  DEFAULT_SETTINGS,
+  type HidingSpot,
+  type LatLng,
+  type Player,
+  type Room,
+  type Settings,
+} from "../shared/types";
+import { computeScore, haversineKm } from "../shared/scoring";
+import { generatePlayerId, generateRoomCode, generateToken } from "../shared/codes";
+
+const MAX_PLAYERS = 12;
+
+export function createRoom(gmName: string, settings?: Partial<Settings>): {
+  room: Room;
+  player: Player;
+} {
+  const player = newPlayer(gmName, true);
+  const room: Room = {
+    code: generateRoomCode(),
+    phase: "lobby",
+    settings: { ...DEFAULT_SETTINGS, ...settings },
+    gameMasterId: player.id,
+    players: [player],
+    order: [],
+    currentRound: 0,
+  };
+  return { room, player };
+}
+
+function newPlayer(name: string, isGameMaster: boolean): Player {
+  return {
+    id: generatePlayerId(),
+    name: name.trim().slice(0, 24) || "Player",
+    sessionToken: generateToken(),
+    isGameMaster,
+    connected: true,
+    socketId: null,
+    hiding: null,
+    hasHidden: false,
+    guesses: {},
+    totalScore: 0,
+  };
+}
+
+export type AddResult =
+  | { ok: true; player: Player }
+  | { ok: false; error: "in_progress" | "name_taken" | "full" };
+
+export function addPlayer(room: Room, name: string): AddResult {
+  if (room.phase !== "lobby") return { ok: false, error: "in_progress" };
+  if (room.players.length >= MAX_PLAYERS) return { ok: false, error: "full" };
+  const trimmed = name.trim().slice(0, 24);
+  if (
+    room.players.some(
+      (p) => p.name.toLowerCase() === trimmed.toLowerCase(),
+    )
+  ) {
+    return { ok: false, error: "name_taken" };
+  }
+  const player = newPlayer(trimmed, false);
+  room.players.push(player);
+  return { ok: true, player };
+}
+
+export function findPlayer(room: Room, playerId: string): Player | undefined {
+  return room.players.find((p) => p.id === playerId);
+}
+
+export function findByToken(room: Room, token: string): Player | undefined {
+  return room.players.find((p) => p.sessionToken === token);
+}
+
+export function connectedPlayers(room: Room): Player[] {
+  return room.players.filter((p) => p.connected);
+}
+
+// --- lobby -> hiding -------------------------------------------------------
+
+export function startGame(room: Room): boolean {
+  if (room.phase !== "lobby") return false;
+  if (connectedPlayers(room).length < 2) return false;
+  room.phase = "hiding";
+  for (const p of room.players) {
+    p.hiding = null;
+    p.hasHidden = false;
+    p.guesses = {};
+    p.totalScore = 0;
+  }
+  return true;
+}
+
+// --- hiding ----------------------------------------------------------------
+
+export function recordHide(room: Room, playerId: string, spot: HidingSpot): boolean {
+  if (room.phase !== "hiding") return false;
+  const p = findPlayer(room, playerId);
+  if (!p) return false;
+  p.hiding = spot;
+  p.hasHidden = true;
+  return true;
+}
+
+export function allConnectedHidden(room: Room): boolean {
+  const connected = connectedPlayers(room);
+  return connected.length >= 2 && connected.every((p) => p.hasHidden);
+}
+
+/** Build the shuffled round order from everyone who has a hiding spot. */
+export function startFinding(room: Room): boolean {
+  const hidden = room.players.filter((p) => p.hasHidden && p.hiding);
+  if (hidden.length < 2) return false;
+  room.order = shuffle(hidden.map((p) => p.id));
+  room.currentRound = 0;
+  room.phase = "finding";
+  return true;
+}
+
+// --- finding ---------------------------------------------------------------
+
+export function currentTargetId(room: Room): string | null {
+  if (room.phase !== "finding" && room.phase !== "results") return null;
+  return room.order[room.currentRound] ?? null;
+}
+
+export function recordGuess(room: Room, guesserId: string, at: LatLng): boolean {
+  if (room.phase !== "finding") return false;
+  const targetId = currentTargetId(room);
+  if (!targetId || guesserId === targetId) return false;
+  const guesser = findPlayer(room, guesserId);
+  const target = findPlayer(room, targetId);
+  if (!guesser || !target || !target.hiding) return false;
+
+  const distanceKm = haversineKm(at, target.hiding);
+  const points = computeScore(distanceKm, room.settings);
+  guesser.guesses[targetId] = { ...at, distanceKm, points };
+  return true;
+}
+
+export function expectedGuessers(room: Room): Player[] {
+  const targetId = currentTargetId(room);
+  return connectedPlayers(room).filter((p) => p.id !== targetId);
+}
+
+export function allGuessed(room: Room): boolean {
+  const targetId = currentTargetId(room);
+  if (!targetId) return false;
+  const expected = expectedGuessers(room);
+  if (expected.length === 0) return false;
+  return expected.every((p) => p.guesses[targetId]);
+}
+
+/** Tally the current round's points into totals and move to results. */
+export function scoreRound(room: Room): boolean {
+  if (room.phase !== "finding") return false;
+  const targetId = currentTargetId(room);
+  if (!targetId) return false;
+  for (const p of room.players) {
+    const g = p.guesses[targetId];
+    if (g) p.totalScore += g.points;
+  }
+  room.phase = "results";
+  return true;
+}
+
+// --- results -> next / finished -------------------------------------------
+
+export function nextRound(room: Room): boolean {
+  if (room.phase !== "results") return false;
+  if (room.currentRound + 1 >= room.order.length) {
+    room.phase = "finished";
+  } else {
+    room.currentRound += 1;
+    room.phase = "finding";
+  }
+  return true;
+}
+
+export function returnToLobby(room: Room): boolean {
+  room.phase = "lobby";
+  room.order = [];
+  room.currentRound = 0;
+  for (const p of room.players) {
+    p.hiding = null;
+    p.hasHidden = false;
+    p.guesses = {};
+    p.totalScore = 0;
+  }
+  return true;
+}
+
+/** GM escape hatch: progress whatever phase we're in, even if not everyone acted. */
+export function forceAdvance(room: Room): boolean {
+  switch (room.phase) {
+    case "hiding":
+      return startFinding(room);
+    case "finding":
+      return scoreRound(room);
+    case "results":
+      return nextRound(room);
+    default:
+      return false;
+  }
+}
+
+// --- helpers ---------------------------------------------------------------
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}

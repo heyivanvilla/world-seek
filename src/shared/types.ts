@@ -1,0 +1,138 @@
+// Shared types used by BOTH the Socket.IO server and the React client.
+
+export type Phase = "lobby" | "hiding" | "finding" | "results" | "finished";
+
+export interface Settings {
+  /** Points awarded for a perfect guess. */
+  maxPoints: number;
+  /** Distance (km) controlling how fast the score decays. Larger = more forgiving. */
+  scoreScaleKm: number;
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  maxPoints: 5000,
+  scoreScaleKm: 2000,
+};
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+export interface HidingSpot extends LatLng {
+  /** Street View panorama id at this spot (broadcast to guessers instead of coords). */
+  panoId: string;
+}
+
+export interface Guess extends LatLng {
+  distanceKm: number;
+  points: number;
+}
+
+// ---------------------------------------------------------------------------
+// Server-internal model (never sent verbatim to clients).
+// ---------------------------------------------------------------------------
+
+export interface Player {
+  id: string;
+  name: string;
+  sessionToken: string; // secret — never projected
+  isGameMaster: boolean;
+  connected: boolean;
+  socketId: string | null; // live socket, for per-player emits
+  hiding: HidingSpot | null; // secret until results
+  hasHidden: boolean;
+  guesses: Record<string, Guess>; // targetPlayerId -> this player's guess
+  totalScore: number;
+}
+
+export interface Room {
+  code: string;
+  phase: Phase;
+  settings: Settings;
+  gameMasterId: string;
+  players: Player[];
+  order: string[]; // shuffled player ids being guessed, one per round
+  currentRound: number; // index into order
+}
+
+// ---------------------------------------------------------------------------
+// Public projection (what a given client actually receives).
+// ---------------------------------------------------------------------------
+
+export interface PublicPlayer {
+  id: string;
+  name: string;
+  isGameMaster: boolean;
+  connected: boolean;
+  hasHidden: boolean;
+  totalScore: number;
+}
+
+export interface CurrentTarget {
+  id: string;
+  name: string;
+  panoId: string; // imagery only; coords never sent here
+}
+
+export interface PublicGuess extends LatLng {
+  playerId: string;
+  name: string;
+  distanceKm: number;
+  points: number;
+}
+
+export interface RoundResult {
+  targetId: string;
+  targetName: string;
+  real: LatLng; // revealed only in results
+  guesses: PublicGuess[];
+}
+
+export interface PublicState {
+  code: string;
+  phase: Phase;
+  settings: Settings;
+  gameMasterId: string;
+  players: PublicPlayer[];
+
+  youId: string;
+  youAreGameMaster: boolean;
+
+  // hiding phase
+  youHaveHidden: boolean;
+  hiddenCount: number;
+  expectedHiders: number;
+
+  // finding phase
+  currentRound: number;
+  totalRounds: number;
+  currentTarget: CurrentTarget | null; // null when you are the target
+  youAreTarget: boolean;
+  youHaveGuessed: boolean;
+  guessedCount: number;
+  expectedGuessers: number;
+
+  // results phase
+  result: RoundResult | null;
+}
+
+// ---------------------------------------------------------------------------
+// Socket payloads
+// ---------------------------------------------------------------------------
+
+export interface CreateAck {
+  code: string;
+  sessionToken: string;
+  playerId: string;
+}
+
+export type JoinError = "not_found" | "in_progress" | "name_taken" | "full";
+
+export type JoinAck =
+  | { ok: true; sessionToken: string; playerId: string }
+  | { ok: false; error: JoinError };
+
+export type ReconnectAck =
+  | { ok: true; playerId: string }
+  | { ok: false; error: "not_found" | "bad_token" };

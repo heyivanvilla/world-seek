@@ -1,0 +1,124 @@
+"use client";
+
+import type { PublicState } from "@/shared/types";
+import { formatDistance } from "@/shared/scoring";
+import MapPicker, { type MapLine, type MapMarker } from "./MapPicker";
+
+const PALETTE = [
+  "#6c7bff", "#3ddc97", "#ffcc66", "#ff6b6b", "#c084fc", "#22d3ee",
+  "#f472b6", "#a3e635", "#fb923c", "#60a5fa", "#f87171", "#34d399",
+];
+
+interface Props {
+  state: PublicState;
+  onNext: () => void;
+}
+
+export default function ResultsPhase({ state, onNext }: Props) {
+  const result = state.result;
+  const isLast = state.currentRound + 1 >= state.totalRounds;
+
+  if (!result) {
+    return (
+      <div className="center-screen">
+        <p className="muted">Tallying the round…</p>
+      </div>
+    );
+  }
+
+  const colorFor = (i: number) => PALETTE[i % PALETTE.length];
+
+  const markers: MapMarker[] = [
+    {
+      lat: result.real.lat,
+      lng: result.real.lng,
+      title: `${result.targetName}'s real hiding spot`,
+    },
+    ...result.guesses.map((g, i) => ({
+      lat: g.lat,
+      lng: g.lng,
+      color: colorFor(i),
+      title: `${g.name} · ${formatDistance(g.distanceKm)} · ${g.points} pts`,
+    })),
+  ];
+
+  const lines: MapLine[] = result.guesses.map((g, i) => ({
+    from: { lat: g.lat, lng: g.lng },
+    to: result.real,
+    color: colorFor(i),
+  }));
+
+  return (
+    <div className="full-bleed">
+      <div className="split">
+        <div style={{ position: "relative" }}>
+          <div className="overlay-top">
+            <strong>{result.targetName}</strong> was hiding here 📍
+          </div>
+          <MapPicker markers={markers} lines={lines} fitToContent />
+        </div>
+        <div
+          style={{
+            padding: 24,
+            overflowY: "auto",
+            background: "var(--bg)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <div className="stack" style={{ gap: 4 }}>
+            <span className="muted">
+              Round {state.currentRound + 1} of {state.totalRounds}
+            </span>
+            <h2 className="title" style={{ fontSize: 22 }}>
+              This round's guesses
+            </h2>
+          </div>
+
+          <div className="stack" style={{ gap: 8 }}>
+            {result.guesses.map((g, i) => (
+              <div key={g.playerId} className="player-row">
+                <div className="row" style={{ gap: 8 }}>
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 999,
+                      background: colorFor(i),
+                      display: "inline-block",
+                    }}
+                  />
+                  <strong>{g.name}</strong>
+                  <span className="muted">{formatDistance(g.distanceKm)}</span>
+                </div>
+                <strong>+{g.points.toLocaleString()}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="stack" style={{ gap: 8 }}>
+            <strong className="muted">Standings</strong>
+            {state.players.map((p) => (
+              <div key={p.id} className="player-row">
+                <span>
+                  {p.name}
+                  {p.id === state.youId && <span className="badge"> you</span>}
+                </span>
+                <strong>{p.totalScore.toLocaleString()}</strong>
+              </div>
+            ))}
+          </div>
+
+          {state.youAreGameMaster ? (
+            <button onClick={onNext}>
+              {isLast ? "See final scores" : "Next round"}
+            </button>
+          ) : (
+            <p className="muted">Waiting for the host to continue…</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
