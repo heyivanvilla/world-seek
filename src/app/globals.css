@@ -245,6 +245,133 @@ input:focus {
   max-width: calc(100% - 32px);
 }
 
+/* The hiding-phase bar mounts only after the first pin drop — slide + fade it in
+   so the player notices the confirm control appear. (keeps the translateX(-50%)
+   centering from .overlay-bar throughout the animation.) */
+.overlay-bar--reveal {
+  animation: overlay-bar-in 0.4s ease both;
+}
+
+/* A glowing ring drawn as a pseudo-element so its pulse animation is independent
+   of the bar's own entry animation (both can't live on the `animation` property).
+   Invisible until .overlay-bar--thinking pulses it — the "checking Street View"
+   indicator that replaces the old status text. */
+.overlay-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    0 0 0 1px rgba(232, 176, 75, 0.7),
+    0 0 12px 2px rgba(232, 176, 75, 0.55);
+}
+
+.overlay-bar--thinking::after {
+  animation: overlay-bar-glow 1.4s ease-in-out infinite;
+}
+
+@keyframes overlay-bar-glow {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes overlay-bar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Fixed-size slot so the bar's width/height stay constant as the message text
+   changes between states (otherwise the center-anchored bar resizes and drifts). */
+.overlay-bar-msg {
+  width: 280px;
+  min-height: 2.6em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Centered intro/instruction modal over a dimmed, blurred backdrop. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  padding: 24px;
+  overflow-y: auto;
+  background: rgba(20, 10, 7, 0.6);
+  backdrop-filter: blur(4px);
+  animation: modal-fade-in 0.2s ease both;
+}
+
+.modal {
+  margin: auto;
+  position: relative;
+  width: 460px;
+  max-width: 100%;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px;
+  animation: modal-pop-in 0.25s ease both;
+}
+
+.modal-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Compact bullet list for modal copy — tight spacing, accent-tinted markers. */
+.modal-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.modal-list li::marker {
+  color: var(--accent);
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .overlay-top {
   position: absolute;
   top: 16px;

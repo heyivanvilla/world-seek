@@ -33,6 +33,8 @@ export default function HidingPhase({ state, onHide, onForce }: Props) {
   const [queryRadius, setQueryRadius] = useState(120);
   const [resolved, setResolved] = useState<ResolvedPano | null>(null);
   const [coverage, setCoverage] = useState<Coverage>("unknown");
+  // Intro modal shown once when the hiding phase opens.
+  const [showIntro, setShowIntro] = useState(true);
 
   // --- already hidden: waiting view ---
   if (state.youHaveHidden) {
@@ -98,10 +100,32 @@ export default function HidingPhase({ state, onHide, onForce }: Props) {
     <div className="full-bleed">
       <div className="split">
         <div style={{ position: "relative" }}>
-          <div className="overlay-top">
-            Click the map to drop in · zoom in (blue roads) for precise placement
-          </div>
           <MapPicker value={markerSpot} onChange={pick} coverage />
+
+          {query && (
+            <div
+              className={`overlay-bar overlay-bar--reveal${
+                coverage === "checking" ? " overlay-bar--thinking" : ""
+              }`}
+            >
+              <span className="overlay-bar-msg">
+                {/* The "walk around" text persists through checking (the glowing
+                   border signals thinking); only a no-coverage spot swaps it. */}
+                {coverage === "none" ? (
+                  <span style={{ color: "var(--warn)" }}>
+                    No Street View there — click closer to a road.
+                  </span>
+                ) : (
+                  <span className="muted">
+                    Walk around to your spot, then hide here.
+                  </span>
+                )}
+              </span>
+              <button onClick={confirm} disabled={!canHide}>
+                Hide here
+              </button>
+            </div>
+          )}
         </div>
         <div style={{ position: "relative", background: "#000" }}>
           {query ? (
@@ -127,23 +151,39 @@ export default function HidingPhase({ state, onHide, onForce }: Props) {
         </div>
       </div>
 
-      <div className="overlay-bar">
-        {!query && <span className="muted">Pick somewhere on the map to begin.</span>}
-        {coverage === "checking" && <span className="muted">Checking Street View…</span>}
-        {coverage === "none" && (
-          <span style={{ color: "var(--warn)" }}>
-            No Street View there — click closer to a road.
-          </span>
-        )}
-        {coverage === "ok" && (
-          <span className="muted">
-            Walk around to your spot, then hide here.
-          </span>
-        )}
-        <button onClick={confirm} disabled={!canHide}>
-          Hide here
-        </button>
-      </div>
+      {showIntro && (
+        <div className="modal-backdrop" onClick={() => setShowIntro(false)}>
+          <div
+            className="modal stack"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="ghost modal-x"
+              aria-label="Close"
+              onClick={() => setShowIntro(false)}
+            >
+              ✕
+            </button>
+            <h2 className="title" style={{ margin: 0 }}>
+              Pick your hiding spot 🫥
+            </h2>
+            <ul className="modal-list">
+              <li>Click the map to drop your pin</li>
+              <li>Zoom into the blue roads for precise Street View placement</li>
+            </ul>
+            <div className="card stack" style={{ gap: 8 }}>
+              <span className="eyebrow">You set the difficulty 🎚️</span>
+              <ul className="modal-list muted" style={{ fontSize: 13 }}>
+                <li>Hide by street signs, addresses or car plates to leave clues</li>
+                <li>Pick somewhere blank to send everyone wandering</li>
+              </ul>
+            </div>
+            <button onClick={() => setShowIntro(false)}>Let's go</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

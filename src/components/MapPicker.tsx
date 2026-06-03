@@ -57,6 +57,9 @@ export default function MapPicker({
         center: { lat: 20, lng: 0 },
         zoom: 2,
         minZoom: 2,
+        // Color of the map div behind the tiles — visible in the void past the
+        // edges of the world when zoomed out. Match the water tone so it blends.
+        backgroundColor: "#5c2a1a",
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
