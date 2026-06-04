@@ -6,9 +6,9 @@ import type {
   JoinAck,
   JoinError,
   LatLng,
+  PeekAck,
   PublicState,
   ReconnectAck,
-  Settings,
 } from "@/shared/types";
 import { emitAck, getSocket } from "./socket";
 import { clearSession, loadSession, saveSession } from "./session";
@@ -23,6 +23,8 @@ function joinErrorMessage(err: JoinError): string {
       return "This game is already in progress — you can't join right now.";
     case "name_taken":
       return "That name is taken. Try another.";
+    case "emoji_taken":
+      return "That avatar was just taken. Pick another.";
     case "full":
       return "This game is full.";
   }
@@ -83,21 +85,30 @@ export function useGame(code: string) {
   }, [code]);
 
   const join = useCallback(
-    async (name: string): Promise<boolean> => {
-      const res = await emitAck<JoinAck>("game:join", { code, name });
+    async (
+      name: string,
+      emoji: string,
+    ): Promise<{ ok: boolean; takenEmojis?: string[] }> => {
+      const res = await emitAck<JoinAck>("game:join", { code, name, emoji });
       if (res.ok) {
         saveSession(code, {
           sessionToken: res.sessionToken,
           playerId: res.playerId,
         });
         setError(null);
-        return true;
+        return { ok: true };
       }
       setError(joinErrorMessage(res.error));
-      return false;
+      return { ok: false, takenEmojis: res.takenEmojis };
     },
     [code],
   );
+
+  // Pre-join read so the join picker can grey out already-taken emojis.
+  const peek = useCallback(async (): Promise<string[]> => {
+    const res = await emitAck<PeekAck>("game:peek", { code });
+    return res.ok ? res.takenEmojis : [];
+  }, [code]);
 
   const start = useCallback(() => getSocket().emit("game:start"), []);
   const hide = useCallback(
@@ -109,17 +120,8 @@ export function useGame(code: string) {
     [],
   );
   const nextRound = useCallback(() => getSocket().emit("round:next"), []);
-  const forceAdvance = useCallback(
-    () => getSocket().emit("game:forceAdvance"),
-    [],
-  );
   const returnToLobby = useCallback(
     () => getSocket().emit("game:returnToLobby"),
-    [],
-  );
-  const updateSettings = useCallback(
-    (settings: Partial<Settings>) =>
-      getSocket().emit("game:updateSettings", { settings }),
     [],
   );
 
@@ -129,12 +131,11 @@ export function useGame(code: string) {
     error,
     connected,
     join,
+    peek,
     start,
     hide,
     guess,
     nextRound,
-    forceAdvance,
     returnToLobby,
-    updateSettings,
   };
 }

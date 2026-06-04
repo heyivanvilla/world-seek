@@ -20,30 +20,26 @@ export default function GameRoom({ code }: { code: string }) {
   }
 
   if (game.status === "need-join" || !game.state) {
-    return <JoinForm code={code} error={game.error} onJoin={game.join} />;
+    return (
+      <JoinForm
+        code={code}
+        error={game.error}
+        onJoin={game.join}
+        onPeek={game.peek}
+      />
+    );
   }
 
   const s = game.state;
 
   switch (s.phase) {
     case "lobby":
-      return (
-        <Lobby
-          state={s}
-          onStart={game.start}
-          onUpdateSettings={game.updateSettings}
-        />
-      );
+      return <Lobby state={s} onStart={game.start} />;
     case "hiding":
-      return <HidingPhase state={s} onHide={game.hide} onForce={game.forceAdvance} />;
+      return <HidingPhase state={s} onHide={game.hide} />;
     case "finding":
       return (
-        <FindingPhase
-          key={s.currentRound}
-          state={s}
-          onGuess={game.guess}
-          onForce={game.forceAdvance}
-        />
+        <FindingPhase key={s.currentRound} state={s} onGuess={game.guess} />
       );
     case "results":
       return <ResultsPhase key={s.currentRound} state={s} onNext={game.nextRound} />;

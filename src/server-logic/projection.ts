@@ -17,6 +17,7 @@ function publicPlayer(p: Room["players"][number]): PublicPlayer {
   return {
     id: p.id,
     name: p.name,
+    emoji: p.emoji,
     isGameMaster: p.isGameMaster,
     connected: p.connected,
     hasHidden: p.hasHidden,
@@ -46,6 +47,7 @@ export function projectFor(room: Room, viewerId: string): PublicState {
       currentTarget = {
         id: target.id,
         name: target.name,
+        emoji: target.emoji,
         panoId: target.hiding.panoId,
       };
     }
@@ -63,6 +65,7 @@ export function projectFor(room: Room, viewerId: string): PublicState {
           return {
             playerId: p.id,
             name: p.name,
+            emoji: p.emoji,
             lat: g.lat,
             lng: g.lng,
             distanceKm: g.distanceKm,
@@ -75,6 +78,7 @@ export function projectFor(room: Room, viewerId: string): PublicState {
       result = {
         targetId: target.id,
         targetName: target.name,
+        targetEmoji: target.emoji,
         real: { lat: target.hiding.lat, lng: target.hiding.lng },
         guesses,
       };
@@ -95,6 +99,7 @@ export function projectFor(room: Room, viewerId: string): PublicState {
     players,
 
     youId: viewerId,
+    youEmoji: viewer?.emoji ?? "",
     youAreGameMaster: !!viewer?.isGameMaster,
 
     youHaveHidden: !!viewer?.hasHidden,

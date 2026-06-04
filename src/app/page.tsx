@@ -4,23 +4,43 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { emitAck } from "@/lib/socket";
 import { saveSession } from "@/lib/session";
+import { DEFAULT_EMOJI } from "@/shared/emojis";
+import EmojiPicker from "@/components/EmojiPicker";
 import type { CreateAck } from "@/shared/types";
 
 export default function Home() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function startGame() {
     if (!name.trim() || busy) return;
     setBusy(true);
-    const res = await emitAck<CreateAck>("game:create", { gmName: name.trim() });
+    const res = await emitAck<CreateAck>("game:create", {
+      gmName: name.trim(),
+      gmEmoji: emoji,
+    });
     saveSession(res.code, {
       sessionToken: res.sessionToken,
       playerId: res.playerId,
     });
     router.push(`/game/${res.code}`);
+  }
+
+  // Codes are 6 letters shown as "xxx-xxx". Strip anything that isn't a letter,
+  // cap at 6, and manage the dash so the user never types it. It appears as soon
+  // as the 3rd letter lands (showing "abr-", ready for the 4th) — but only when
+  // typing forward, so a backspace at "abr-" can still delete the dash.
+  function formatCode(raw: string): string {
+    const letters = raw.toLowerCase().replace(/[^a-z]/g, "").slice(0, 6);
+    if (letters.length < 3) return letters;
+    if (letters.length === 3) {
+      const deleting = raw.length < code.length;
+      return deleting ? letters : `${letters}-`;
+    }
+    return `${letters.slice(0, 3)}-${letters.slice(3)}`;
   }
 
   function joinGame() {
@@ -51,7 +71,7 @@ export default function Home() {
       {/* Film-grain texture layered over the blurred video + terracotta field. */}
       <div className="bg-texture" aria-hidden="true" />
       <div className="stack" style={{ width: 380, gap: 24, position: "relative", zIndex: 1 }}>
-        <div className="stack" style={{ gap: 10 }}>
+        <div className="stack" style={{ gap: 10, textAlign: "center" }}>
           <span className="eyebrow">Open World · Street View</span>
           <h1 className="title" style={{ fontSize: 46 }}>
             World Seek
@@ -70,6 +90,10 @@ export default function Home() {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && startGame()}
           />
+          <span className="muted" style={{ fontSize: 13 }}>
+            Pick your avatar
+          </span>
+          <EmojiPicker value={emoji} onChange={setEmoji} />
           <button disabled={!name.trim() || busy} onClick={startGame}>
             {busy ? "Creating…" : "Start game"}
           </button>
@@ -80,7 +104,8 @@ export default function Home() {
           <input
             placeholder="e.g. abr-tyr"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            maxLength={7}
+            onChange={(e) => setCode(formatCode(e.target.value))}
             onKeyDown={(e) => e.key === "Enter" && joinGame()}
           />
           <button className="secondary" disabled={!code.trim()} onClick={joinGame}>

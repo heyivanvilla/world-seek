@@ -8,14 +8,19 @@ import {
 } from "../shared/types";
 import { computeScore, haversineKm } from "../shared/scoring";
 import { generatePlayerId, generateRoomCode, generateToken } from "../shared/codes";
+import { DEFAULT_EMOJI, isValidEmoji } from "../shared/emojis";
 
 const MAX_PLAYERS = 12;
 
-export function createRoom(gmName: string, settings?: Partial<Settings>): {
+export function createRoom(
+  gmName: string,
+  settings?: Partial<Settings>,
+  gmEmoji?: string,
+): {
   room: Room;
   player: Player;
 } {
-  const player = newPlayer(gmName, true);
+  const player = newPlayer(gmName, true, gmEmoji);
   const room: Room = {
     code: generateRoomCode(),
     phase: "lobby",
@@ -28,10 +33,13 @@ export function createRoom(gmName: string, settings?: Partial<Settings>): {
   return { room, player };
 }
 
-function newPlayer(name: string, isGameMaster: boolean): Player {
+function newPlayer(name: string, isGameMaster: boolean, emoji?: string): Player {
   return {
     id: generatePlayerId(),
     name: name.trim().slice(0, 24) || "Player",
+    // Coerce unknown/missing ids to the default so a client can't inject an
+    // arbitrary image path; uniqueness is enforced separately in addPlayer.
+    emoji: emoji && isValidEmoji(emoji) ? emoji : DEFAULT_EMOJI,
     sessionToken: generateToken(),
     isGameMaster,
     connected: true,
@@ -43,11 +51,16 @@ function newPlayer(name: string, isGameMaster: boolean): Player {
   };
 }
 
+/** Emoji ids already claimed by players in this room (for picker + conflicts). */
+export function takenEmojis(room: Room): string[] {
+  return room.players.map((p) => p.emoji);
+}
+
 export type AddResult =
   | { ok: true; player: Player }
-  | { ok: false; error: "in_progress" | "name_taken" | "full" };
+  | { ok: false; error: "in_progress" | "name_taken" | "emoji_taken" | "full" };
 
-export function addPlayer(room: Room, name: string): AddResult {
+export function addPlayer(room: Room, name: string, emoji?: string): AddResult {
   if (room.phase !== "lobby") return { ok: false, error: "in_progress" };
   if (room.players.length >= MAX_PLAYERS) return { ok: false, error: "full" };
   const trimmed = name.trim().slice(0, 24);
@@ -58,7 +71,11 @@ export function addPlayer(room: Room, name: string): AddResult {
   ) {
     return { ok: false, error: "name_taken" };
   }
-  const player = newPlayer(trimmed, false);
+  const resolved = emoji && isValidEmoji(emoji) ? emoji : DEFAULT_EMOJI;
+  if (room.players.some((p) => p.emoji === resolved)) {
+    return { ok: false, error: "emoji_taken" };
+  }
+  const player = newPlayer(trimmed, false, resolved);
   room.players.push(player);
   return { ok: true, player };
 }
@@ -187,20 +204,6 @@ export function returnToLobby(room: Room): boolean {
     p.totalScore = 0;
   }
   return true;
-}
-
-/** GM escape hatch: progress whatever phase we're in, even if not everyone acted. */
-export function forceAdvance(room: Room): boolean {
-  switch (room.phase) {
-    case "hiding":
-      return startFinding(room);
-    case "finding":
-      return scoreRound(room);
-    case "results":
-      return nextRound(room);
-    default:
-      return false;
-  }
 }
 
 // --- helpers ---------------------------------------------------------------

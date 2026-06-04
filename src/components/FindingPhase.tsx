@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { LatLng, PublicState } from "@/shared/types";
+import { emojiUrl } from "@/shared/emojis";
 import MapPicker from "./MapPicker";
 import StreetView from "./StreetView";
 import PlayerList from "./PlayerList";
@@ -10,10 +11,9 @@ import WaitingBar from "./WaitingBar";
 interface Props {
   state: PublicState;
   onGuess: (at: LatLng) => void;
-  onForce: () => void;
 }
 
-export default function FindingPhase({ state, onGuess, onForce }: Props) {
+export default function FindingPhase({ state, onGuess }: Props) {
   const [guess, setGuess] = useState<LatLng | null>(null);
   const roundLabel = `Round ${state.currentRound + 1} of ${state.totalRounds}`;
 
@@ -32,7 +32,6 @@ export default function FindingPhase({ state, onGuess, onForce }: Props) {
               label="Guesses in"
               current={state.guessedCount}
               total={state.expectedGuessers}
-              onForce={state.youAreGameMaster ? onForce : undefined}
             />
           </div>
         </div>
@@ -52,9 +51,8 @@ export default function FindingPhase({ state, onGuess, onForce }: Props) {
               label="Guesses in"
               current={state.guessedCount}
               total={state.expectedGuessers}
-              onForce={state.youAreGameMaster ? onForce : undefined}
             />
-            <PlayerList players={state.players} youId={state.youId} />
+            <PlayerList players={state.players} />
           </div>
         </div>
       </div>
@@ -65,14 +63,25 @@ export default function FindingPhase({ state, onGuess, onForce }: Props) {
     <div className="full-bleed">
       <div className="split">
         <div style={{ position: "relative", background: "#000" }}>
-          <div className="overlay-top">
-            Where is <strong>{state.currentTarget?.name}</strong> hiding?
+          <div className="overlay-top overlay-top--emoji">
+            {state.currentTarget && (
+              <span className="emoji-inline" aria-hidden="true">
+                <img
+                  className="emoji-img"
+                  src={emojiUrl(state.currentTarget.emoji)}
+                  alt=""
+                />
+              </span>
+            )}
+            <span>
+              Where is <strong>{state.currentTarget?.name}</strong> hiding?
+            </span>
           </div>
           <StreetView mode="pano" panoId={state.currentTarget?.panoId} />
         </div>
         <div style={{ position: "relative" }}>
           <div className="overlay-top">{roundLabel} · drop your guess</div>
-          <MapPicker value={guess} onChange={setGuess} />
+          <MapPicker value={guess} onChange={setGuess} markerIcon={state.youEmoji} />
         </div>
       </div>
 

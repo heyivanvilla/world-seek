@@ -4,6 +4,7 @@ import type {
   HidingSpot,
   JoinAck,
   LatLng,
+  PeekAck,
   ReconnectAck,
   Room,
   Settings,
@@ -22,7 +23,6 @@ import {
   createRoom,
   findByToken,
   findPlayer,
-  forceAdvance,
   nextRound,
   recordGuess,
   recordHide,
@@ -30,6 +30,7 @@ import {
   scoreRound,
   startFinding,
   startGame,
+  takenEmojis,
 } from "../src/server-logic/transitions";
 import { projectFor } from "../src/server-logic/projection";
 
@@ -60,10 +61,14 @@ export function registerHandlers(io: Server): void {
     socket.on(
       "game:create",
       (
-        payload: { gmName: string; settings?: Partial<Settings> },
+        payload: { gmName: string; gmEmoji?: string; settings?: Partial<Settings> },
         ack: (res: CreateAck) => void,
       ) => {
-        const { room, player } = createRoom(payload?.gmName ?? "", payload?.settings);
+        const { room, player } = createRoom(
+          payload?.gmName ?? "",
+          payload?.settings,
+          payload?.gmEmoji,
+        );
         player.socketId = socket.id;
         saveRoom(room);
         bindSocket(socket.id, room.code, player.id);
@@ -72,16 +77,33 @@ export function registerHandlers(io: Server): void {
       },
     );
 
+    // Lightweight pre-join read so an unjoined client can grey out taken emojis.
+    socket.on(
+      "game:peek",
+      (payload: { code: string }, ack: (res: PeekAck) => void) => {
+        const room = getRoom(payload?.code ?? "");
+        if (!room) return ack({ ok: false });
+        ack({ ok: true, takenEmojis: takenEmojis(room) });
+      },
+    );
+
     socket.on(
       "game:join",
       (
-        payload: { code: string; name: string },
+        payload: { code: string; name: string; emoji?: string },
         ack: (res: JoinAck) => void,
       ) => {
         const room = getRoom(payload?.code ?? "");
         if (!room) return ack({ ok: false, error: "not_found" });
-        const result = addPlayer(room, payload?.name ?? "");
-        if (!result.ok) return ack({ ok: false, error: result.error });
+        const result = addPlayer(room, payload?.name ?? "", payload?.emoji);
+        if (!result.ok) {
+          // On an emoji clash, hand back the fresh taken set so the picker updates.
+          return ack(
+            result.error === "emoji_taken"
+              ? { ok: false, error: result.error, takenEmojis: takenEmojis(room) }
+              : { ok: false, error: result.error },
+          );
+        }
         result.player.socketId = socket.id;
         saveRoom(room);
         bindSocket(socket.id, room.code, result.player.id);
@@ -112,14 +134,6 @@ export function registerHandlers(io: Server): void {
       },
     );
 
-    socket.on("game:updateSettings", (payload: { settings: Partial<Settings> }) => {
-      const s = seat(socket);
-      if (!s || !isGameMaster(s.room, s.playerId)) return;
-      if (s.room.phase !== "lobby") return;
-      s.room.settings = { ...s.room.settings, ...payload?.settings };
-      broadcastState(io, s.room);
-    });
-
     socket.on("game:start", () => {
       const s = seat(socket);
       if (!s || !isGameMaster(s.room, s.playerId)) return;
@@ -146,12 +160,6 @@ export function registerHandlers(io: Server): void {
       const s = seat(socket);
       if (!s || !isGameMaster(s.room, s.playerId)) return;
       if (nextRound(s.room)) broadcastState(io, s.room);
-    });
-
-    socket.on("game:forceAdvance", () => {
-      const s = seat(socket);
-      if (!s || !isGameMaster(s.room, s.playerId)) return;
-      if (forceAdvance(s.room)) broadcastState(io, s.room);
     });
 
     socket.on("game:returnToLobby", () => {

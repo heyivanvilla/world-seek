@@ -1,6 +1,7 @@
 "use client";
 
 import type { PublicState } from "@/shared/types";
+import { emojiUrl } from "@/shared/emojis";
 
 interface Props {
   state: PublicState;
@@ -34,6 +35,9 @@ export default function FinalScores({ state, onReturnToLobby }: Props) {
             <div key={p.id} className="player-row">
               <div className="row" style={{ gap: 10 }}>
                 <span style={{ width: 24 }}>{MEDALS[i] ?? `${i + 1}.`}</span>
+                <span className="roster-avatar" aria-hidden="true">
+                  <img className="emoji-img" src={emojiUrl(p.emoji)} alt="" />
+                </span>
                 <strong>{p.name}</strong>
                 {p.id === state.youId && <span className="badge">you</span>}
               </div>

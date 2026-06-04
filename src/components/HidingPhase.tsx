@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { HidingSpot, LatLng, PublicState } from "@/shared/types";
+import EmojiStill from "./EmojiStill";
 import MapPicker from "./MapPicker";
 import StreetView, { type ResolvedPano } from "./StreetView";
 import PlayerList from "./PlayerList";
@@ -10,7 +11,6 @@ import WaitingBar from "./WaitingBar";
 interface Props {
   state: PublicState;
   onHide: (spot: HidingSpot) => void;
-  onForce: () => void;
 }
 
 type Coverage = "unknown" | "checking" | "ok" | "none";
@@ -24,7 +24,7 @@ function snapRadius(lat: number, zoom: number): number {
   return Math.min(200000, Math.max(40, Math.round(metersPerPixel * 40)));
 }
 
-export default function HidingPhase({ state, onHide, onForce }: Props) {
+export default function HidingPhase({ state, onHide }: Props) {
   // `query` is the clicked point we resolve from (only changes on a click, so
   // Street View resolves exactly once per pick). `resolved` is the snapped
   // panorama. Keeping them separate avoids feeding the snap back into the
@@ -50,11 +50,9 @@ export default function HidingPhase({ state, onHide, onForce }: Props) {
               label="Players hidden"
               current={state.hiddenCount}
               total={state.expectedHiders}
-              onForce={state.youAreGameMaster ? onForce : undefined}
             />
             <PlayerList
               players={state.players}
-              youId={state.youId}
               showHidden
               hiddenLabel="hidden"
             />
@@ -100,7 +98,49 @@ export default function HidingPhase({ state, onHide, onForce }: Props) {
     <div className="full-bleed">
       <div className="split">
         <div style={{ position: "relative" }}>
-          <MapPicker value={markerSpot} onChange={pick} coverage />
+          <MapPicker
+            value={markerSpot}
+            onChange={pick}
+            markerIcon={state.youEmoji}
+            coverage
+          />
+
+          {/* Presence roster: who's in the game and who has locked a spot. Sits
+             behind the intro modal, so it surfaces once the player taps "Let's
+             go". Collapses to avatar dots on phones (see .roster in globals). */}
+          <div className="roster" role="status" aria-label="Hiding status">
+            <div className="roster-head">
+              <span>Hiding spots</span>
+              <span className="roster-count">
+                {state.hiddenCount}/{state.expectedHiders}
+              </span>
+            </div>
+            <div className="roster-list">
+              {state.players.map((p) => (
+                <div
+                  key={p.id}
+                  className={`roster-player ${
+                    p.hasHidden ? "is-hidden" : "is-waiting"
+                  }${p.connected ? "" : " is-off"}`}
+                  title={`${p.name} — ${
+                    !p.connected
+                      ? "offline"
+                      : p.hasHidden
+                        ? "hidden"
+                        : "still picking"
+                  }`}
+                >
+                  <span className="roster-avatar" aria-hidden="true">
+                    <EmojiStill emoji={p.emoji} className="emoji-img" />
+                  </span>
+                  <span className="roster-name">{p.name}</span>
+                  <span className="roster-status">
+                    {!p.connected ? "off" : p.hasHidden ? "hidden" : "picking…"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {query && (
             <div
