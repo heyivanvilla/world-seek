@@ -1,10 +1,10 @@
 "use client";
 
 import type { PublicPlayer } from "@/shared/types";
+import { emojiUrl } from "@/shared/emojis";
 
 interface Props {
   players: PublicPlayer[];
-  youId: string;
   showScore?: boolean;
   showHidden?: boolean;
   hiddenLabel?: string;
@@ -12,7 +12,6 @@ interface Props {
 
 export default function PlayerList({
   players,
-  youId,
   showScore,
   showHidden,
   hiddenLabel = "ready",
@@ -25,8 +24,10 @@ export default function PlayerList({
       {players.map((p) => (
         <div key={p.id} className="player-row">
           <div className="row" style={{ gap: 8 }}>
+            <span className="roster-avatar" aria-hidden="true">
+              <img className="emoji-img" src={emojiUrl(p.emoji)} alt="" />
+            </span>
             <strong>{p.name}</strong>
-            {p.id === youId && <span className="badge">you</span>}
             {p.isGameMaster && <span className="badge">host</span>}
             {!p.connected && <span className="badge off">offline</span>}
           </div>

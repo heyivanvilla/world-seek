@@ -1,22 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import type { PublicState, Settings } from "@/shared/types";
+import type { PublicState } from "@/shared/types";
 import PlayerList from "./PlayerList";
-
-const DIFFICULTIES: { label: string; scoreScaleKm: number }[] = [
-  { label: "Easy", scoreScaleKm: 4000 },
-  { label: "Normal", scoreScaleKm: 2000 },
-  { label: "Hard", scoreScaleKm: 800 },
-];
 
 interface Props {
   state: PublicState;
   onStart: () => void;
-  onUpdateSettings: (s: Partial<Settings>) => void;
 }
 
-export default function Lobby({ state, onStart, onUpdateSettings }: Props) {
+export default function Lobby({ state, onStart }: Props) {
   const [copied, setCopied] = useState(false);
   const isGM = state.youAreGameMaster;
   const enoughPlayers = state.players.length >= 2;
@@ -34,9 +27,12 @@ export default function Lobby({ state, onStart, onUpdateSettings }: Props) {
       <div className="stack" style={{ width: 440, gap: 20 }}>
         <div className="stack" style={{ gap: 6 }}>
           <h1 className="title">Lobby</h1>
-          <div className="row" style={{ gap: 10 }}>
+          <div
+            className="row"
+            style={{ gap: 10, justifyContent: "space-between", alignItems: "stretch" }}
+          >
             <span className="code-pill">{state.code}</span>
-            <button className="ghost" onClick={copyLink}>
+            <button className="secondary" onClick={copyLink}>
               {copied ? "Copied!" : "Copy invite link"}
             </button>
           </div>
@@ -47,30 +43,11 @@ export default function Lobby({ state, onStart, onUpdateSettings }: Props) {
             <span className="eyebrow">Players ({state.players.length})</span>
             <span className="muted">2–12 players</span>
           </div>
-          <PlayerList players={state.players} youId={state.youId} />
+          <PlayerList players={state.players} />
         </div>
 
         {isGM ? (
           <div className="card stack">
-            <span className="eyebrow">Difficulty</span>
-            <div className="row" style={{ gap: 8 }}>
-              {DIFFICULTIES.map((d) => (
-                <button
-                  key={d.label}
-                  className={
-                    state.settings.scoreScaleKm === d.scoreScaleKm
-                      ? ""
-                      : "secondary"
-                  }
-                  onClick={() => onUpdateSettings({ scoreScaleKm: d.scoreScaleKm })}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Harder = points drop off faster with distance.
-            </p>
             <button onClick={onStart} disabled={!enoughPlayers}>
               {enoughPlayers ? "Start game" : "Need at least 2 players"}
             </button>

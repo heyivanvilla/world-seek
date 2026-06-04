@@ -4,10 +4,9 @@ interface Props {
   label: string;
   current: number;
   total: number;
-  onForce?: () => void;
 }
 
-export default function WaitingBar({ label, current, total, onForce }: Props) {
+export default function WaitingBar({ label, current, total }: Props) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -27,11 +26,6 @@ export default function WaitingBar({ label, current, total, onForce }: Props) {
       >
         <div className="scorebar" style={{ width: `${pct}%`, height: "100%" }} />
       </div>
-      {onForce && (
-        <button className="secondary" onClick={onForce} style={{ marginTop: 4 }}>
-          Skip the wait & continue
-        </button>
-      )}
     </div>
   );
 }

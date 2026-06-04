@@ -36,6 +36,7 @@ export interface Guess extends LatLng {
 export interface Player {
   id: string;
   name: string;
+  emoji: string; // chosen avatar id (see src/shared/emojis.ts); unique per room
   sessionToken: string; // secret — never projected
   isGameMaster: boolean;
   connected: boolean;
@@ -63,6 +64,7 @@ export interface Room {
 export interface PublicPlayer {
   id: string;
   name: string;
+  emoji: string;
   isGameMaster: boolean;
   connected: boolean;
   hasHidden: boolean;
@@ -72,12 +74,14 @@ export interface PublicPlayer {
 export interface CurrentTarget {
   id: string;
   name: string;
+  emoji: string;
   panoId: string; // imagery only; coords never sent here
 }
 
 export interface PublicGuess extends LatLng {
   playerId: string;
   name: string;
+  emoji: string;
   distanceKm: number;
   points: number;
 }
@@ -85,6 +89,7 @@ export interface PublicGuess extends LatLng {
 export interface RoundResult {
   targetId: string;
   targetName: string;
+  targetEmoji: string;
   real: LatLng; // revealed only in results
   guesses: PublicGuess[];
 }
@@ -97,6 +102,7 @@ export interface PublicState {
   players: PublicPlayer[];
 
   youId: string;
+  youEmoji: string; // viewer's own avatar — for their dropped pin
   youAreGameMaster: boolean;
 
   // hiding phase
@@ -127,11 +133,21 @@ export interface CreateAck {
   playerId: string;
 }
 
-export type JoinError = "not_found" | "in_progress" | "name_taken" | "full";
+export type JoinError =
+  | "not_found"
+  | "in_progress"
+  | "name_taken"
+  | "emoji_taken"
+  | "full";
 
 export type JoinAck =
   | { ok: true; sessionToken: string; playerId: string }
-  | { ok: false; error: JoinError };
+  // takenEmojis included on emoji_taken so the picker can refresh its disabled set.
+  | { ok: false; error: JoinError; takenEmojis?: string[] };
+
+export type PeekAck =
+  | { ok: true; takenEmojis: string[] }
+  | { ok: false };
 
 export type ReconnectAck =
   | { ok: true; playerId: string }

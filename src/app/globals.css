@@ -179,6 +179,9 @@ input:focus {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* inline-flex + centered so it can stretch to match an adjacent button's height */
+  display: inline-flex;
+  align-items: center;
   padding: 4px 10px;
   letter-spacing: 1px;
 }
@@ -384,6 +387,224 @@ input:focus {
   backdrop-filter: blur(8px);
 }
 
+/* Hiding-phase presence roster: who's in the game and who has locked a hiding
+   spot. Anchored top-right over the map; on phones it collapses to a compact
+   strip of avatar dots (see the 560px block below). */
+.roster {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 220px;
+  max-width: calc(100% - 32px);
+  background: rgba(28, 16, 12, 0.9);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  backdrop-filter: blur(8px);
+}
+
+.roster-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.roster-count {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Breathing room so the absolutely-positioned check badge (bottom: -3px on the
+     last hidden avatar) sits inside the scroll container instead of poking ~3px
+     past it — otherwise that overflow trips a spurious scrollbar the moment a
+     player at the bottom of the list goes hidden. */
+  padding: 2px 2px 4px;
+  /* Safety net only: a long roster on a short screen scrolls; normal counts just
+     grow the box to fit. */
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.roster-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.roster-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  /* Slight inset so the emoji image sits inside the frame (overflow stays visible
+     so the corner check badge isn't clipped). */
+  padding: 2px;
+  /* Rounded square (matches the picker) — square emoji art fits this far better
+     than a circle, where the corners poke past the ring. */
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  background: var(--bg-elev-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+/* Locked in: green ring + a check badge in the corner. */
+.roster-player.is-hidden .roster-avatar {
+  background: rgba(169, 192, 122, 0.18);
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.roster-player.is-hidden .roster-avatar::after {
+  content: "✓";
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--good);
+  color: var(--accent-ink);
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Still choosing: a soft pulse reads as "in progress". */
+.roster-player.is-waiting .roster-avatar {
+  animation: roster-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes roster-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 176, 75, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(232, 176, 75, 0.22);
+  }
+}
+
+/* Disconnected: dim it, drop the pulse. */
+.roster-player.is-off {
+  opacity: 0.45;
+}
+.roster-player.is-off .roster-avatar {
+  animation: none;
+}
+
+.roster-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roster-status {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.roster-player.is-hidden .roster-status {
+  color: var(--good);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Emoji avatars                                                             */
+/* ------------------------------------------------------------------------- */
+
+/* Shared fit rule: any source size/ratio is letterboxed inside its fixed-size
+   square box — centered, no distortion, no cropping, no overflow. Used for the
+   picker, roster avatars, and map markers. */
+.emoji-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Picker: a grid of equal square cells (image only, no labels). */
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 8px;
+  max-height: 216px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.emoji-cell {
+  cursor: pointer;
+  aspect-ratio: 1 / 1;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.emoji-cell:hover:not(:disabled) {
+  border-color: var(--text-dim);
+  background: rgba(244, 231, 210, 0.06);
+}
+
+.emoji-cell.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  background: rgba(232, 176, 75, 0.12);
+}
+
+.emoji-cell:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+
+/* Small inline avatar for banners / list rows. */
+.emoji-inline {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+}
+
+/* overlay-top variant that lays out an inline avatar beside its text. */
+.overlay-top--emoji {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .split {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -442,6 +663,30 @@ input:focus {
     padding: 7px 11px;
     font-size: 12px;
     max-width: calc(100% - 20px);
+  }
+
+  /* Roster collapses to a wrapping strip of avatar dots — names and status
+     labels drop out, leaving the counter plus the colored/checked avatars. */
+  .roster {
+    top: 10px;
+    right: 10px;
+    width: auto;
+    max-width: calc(100% - 20px);
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .roster-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .roster-name,
+  .roster-status {
+    display: none;
   }
 
   .modal-backdrop {

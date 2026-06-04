@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "@/lib/mapsLoader";
 import { EARTHY_MAP_STYLE } from "@/lib/mapStyle";
+import { createImageMarker, type ImageMarker } from "@/lib/ImageMarkerOverlay";
 import type { LatLng } from "@/shared/types";
 
 export interface MapMarker extends LatLng {
-  color?: string; // hex for a colored dot; omit for a default pin
+  icon?: string; // emoji id -> rendered as an <img> overlay (animates GIFs)
+  size?: number; // px footprint for an emoji icon
+  color?: string; // hex for a colored dot; omit for a default pin (ignored if icon set)
   label?: string; // short text shown on the marker
   title?: string; // hover tooltip
 }
@@ -21,6 +24,8 @@ interface Props {
   value?: LatLng | null;
   /** Reports the clicked point and the map's current zoom (for adaptive snapping). */
   onChange?: (p: LatLng, zoom: number) => void;
+  /** Emoji id for the user's own draggable pin (shows their avatar instead of a red pin). */
+  markerIcon?: string;
   markers?: MapMarker[];
   lines?: MapLine[];
   fitToContent?: boolean;
@@ -32,6 +37,7 @@ interface Props {
 export default function MapPicker({
   value,
   onChange,
+  markerIcon,
   markers,
   lines,
   fitToContent,
@@ -40,8 +46,8 @@ export default function MapPicker({
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const userMarkerRef = useRef<google.maps.Marker | null>(null);
-  const extrasRef = useRef<google.maps.Marker[]>([]);
+  const userMarkerRef = useRef<ImageMarker | google.maps.Marker | null>(null);
+  const extrasRef = useRef<Array<ImageMarker | google.maps.Marker>>([]);
   const linesRef = useRef<google.maps.Polyline[]>([]);
   const coverageRef = useRef<google.maps.StreetViewCoverageLayer | null>(null);
   const onChangeRef = useRef(onChange);
@@ -97,36 +103,62 @@ export default function MapPicker({
     }
   }, [ready, coverage]);
 
-  // --- sync the user's draggable pin ---
+  // --- sync the user's draggable pin (their emoji when markerIcon is set) ---
   useEffect(() => {
     if (!ready || !mapRef.current || typeof google === "undefined") return;
     const map = mapRef.current;
-    if (value) {
-      if (!userMarkerRef.current) {
-        userMarkerRef.current = new google.maps.Marker({
-          map,
-          draggable: !!onChange,
-        });
-        if (onChange) {
-          userMarkerRef.current.addListener(
-            "dragend",
-            (e: google.maps.MapMouseEvent) => {
-              if (e.latLng) {
-                onChangeRef.current?.(
-                  { lat: e.latLng.lat(), lng: e.latLng.lng() },
-                  map.getZoom() ?? 2,
-                );
-              }
-            },
-          );
-        }
+
+    if (!value) {
+      if (userMarkerRef.current) {
+        userMarkerRef.current.setMap(null);
+        userMarkerRef.current = null;
       }
-      userMarkerRef.current.setPosition(value);
-    } else if (userMarkerRef.current) {
+      return;
+    }
+
+    const isEmoji = (m: ImageMarker | google.maps.Marker): m is ImageMarker =>
+      "setEmoji" in m;
+    // Tear down if the kind (emoji overlay vs classic pin) no longer matches.
+    if (
+      userMarkerRef.current &&
+      isEmoji(userMarkerRef.current) !== !!markerIcon
+    ) {
       userMarkerRef.current.setMap(null);
       userMarkerRef.current = null;
     }
-  }, [ready, value, onChange]);
+
+    if (!userMarkerRef.current) {
+      if (markerIcon) {
+        const m = createImageMarker({
+          position: value,
+          emoji: markerIcon,
+          draggable: !!onChange,
+          zIndex: 1000,
+          onDragEnd: (p) => onChangeRef.current?.(p, map.getZoom() ?? 2),
+        });
+        m.setMap(map);
+        userMarkerRef.current = m;
+      } else {
+        const m = new google.maps.Marker({ map, draggable: !!onChange });
+        if (onChange) {
+          m.addListener("dragend", (e: google.maps.MapMouseEvent) => {
+            if (e.latLng) {
+              onChangeRef.current?.(
+                { lat: e.latLng.lat(), lng: e.latLng.lng() },
+                map.getZoom() ?? 2,
+              );
+            }
+          });
+        }
+        userMarkerRef.current = m;
+      }
+    }
+
+    userMarkerRef.current.setPosition(value);
+    if (markerIcon && isEmoji(userMarkerRef.current)) {
+      userMarkerRef.current.setEmoji(markerIcon);
+    }
+  }, [ready, value, onChange, markerIcon]);
 
   // --- sync static markers + lines (results) ---
   useEffect(() => {
@@ -139,6 +171,17 @@ export default function MapPicker({
     linesRef.current = [];
 
     (markers ?? []).forEach((m) => {
+      if (m.icon) {
+        // Emoji marker: <img> overlay (animates GIFs, constant footprint).
+        const marker = createImageMarker({
+          position: { lat: m.lat, lng: m.lng },
+          emoji: m.icon,
+          size: m.size,
+        });
+        marker.setMap(map);
+        extrasRef.current.push(marker);
+        return;
+      }
       const marker = new google.maps.Marker({
         map,
         position: { lat: m.lat, lng: m.lng },

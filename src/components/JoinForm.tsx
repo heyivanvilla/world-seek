@@ -1,23 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { DEFAULT_EMOJI, EMOJIS } from "@/shared/emojis";
+import EmojiPicker from "./EmojiPicker";
 
 interface Props {
   code: string;
   error: string | null;
-  onJoin: (name: string) => Promise<boolean>;
+  onJoin: (
+    name: string,
+    emoji: string,
+  ) => Promise<{ ok: boolean; takenEmojis?: string[] }>;
+  /** Pre-join read of emojis already claimed in this room. */
+  onPeek: () => Promise<string[]>;
 }
 
-export default function JoinForm({ code, error, onJoin }: Props) {
+export default function JoinForm({ code, error, onJoin, onPeek }: Props) {
   const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
+  const [taken, setTaken] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // Load which avatars are already taken so the picker can grey them out.
+  useEffect(() => {
+    let cancelled = false;
+    onPeek().then((t) => {
+      if (!cancelled) setTaken(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [onPeek]);
+
+  const allTaken = taken.length >= EMOJIS.length;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || allTaken) return;
     setSubmitting(true);
-    const ok = await onJoin(name.trim());
-    if (!ok) setSubmitting(false);
+    const res = await onJoin(name.trim(), emoji);
+    if (!res.ok) {
+      // Refresh disabled avatars if we lost an emoji race.
+      if (res.takenEmojis) setTaken(res.takenEmojis);
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -34,8 +60,17 @@ export default function JoinForm({ code, error, onJoin }: Props) {
           maxLength={24}
           onChange={(e) => setName(e.target.value)}
         />
+        <span className="muted" style={{ fontSize: 13 }}>
+          Pick your avatar
+        </span>
+        <EmojiPicker value={emoji} onChange={setEmoji} taken={taken} />
         {error && <p style={{ color: "var(--danger)", margin: 0 }}>{error}</p>}
-        <button type="submit" disabled={!name.trim() || submitting}>
+        {allTaken && (
+          <p style={{ color: "var(--danger)", margin: 0 }}>
+            No avatars left in this game.
+          </p>
+        )}
+        <button type="submit" disabled={!name.trim() || allTaken || submitting}>
           {submitting ? "Joining…" : "Join game"}
         </button>
       </form>

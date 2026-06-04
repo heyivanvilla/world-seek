@@ -2,6 +2,7 @@
 
 import type { PublicState } from "@/shared/types";
 import { formatDistance } from "@/shared/scoring";
+import { emojiUrl } from "@/shared/emojis";
 import MapPicker, { type MapLine, type MapMarker } from "./MapPicker";
 
 const PALETTE = [
@@ -32,12 +33,14 @@ export default function ResultsPhase({ state, onNext }: Props) {
     {
       lat: result.real.lat,
       lng: result.real.lng,
+      icon: result.targetEmoji,
+      size: 54, // hider's real spot, rendered larger
       title: `${result.targetName}'s real hiding spot`,
     },
-    ...result.guesses.map((g, i) => ({
+    ...result.guesses.map((g) => ({
       lat: g.lat,
       lng: g.lng,
-      color: colorFor(i),
+      icon: g.emoji,
       title: `${g.name} · ${formatDistance(g.distanceKm)} · ${g.points} pts`,
     })),
   ];
@@ -52,8 +55,13 @@ export default function ResultsPhase({ state, onNext }: Props) {
     <div className="full-bleed">
       <div className="split">
         <div style={{ position: "relative" }}>
-          <div className="overlay-top">
-            <strong>{result.targetName}</strong> was hiding here 📍
+          <div className="overlay-top overlay-top--emoji">
+            <span className="emoji-inline" aria-hidden="true">
+              <img className="emoji-img" src={emojiUrl(result.targetEmoji)} alt="" />
+            </span>
+            <span>
+              <strong>{result.targetName}</strong> was hiding here 📍
+            </span>
           </div>
           <MapPicker markers={markers} lines={lines} fitToContent />
         </div>
@@ -77,18 +85,12 @@ export default function ResultsPhase({ state, onNext }: Props) {
           </div>
 
           <div className="stack" style={{ gap: 8 }}>
-            {result.guesses.map((g, i) => (
+            {result.guesses.map((g) => (
               <div key={g.playerId} className="player-row">
                 <div className="row" style={{ gap: 8 }}>
-                  <span
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 999,
-                      background: colorFor(i),
-                      display: "inline-block",
-                    }}
-                  />
+                  <span className="roster-avatar" aria-hidden="true">
+                    <img className="emoji-img" src={emojiUrl(g.emoji)} alt="" />
+                  </span>
                   <strong>{g.name}</strong>
                   <span className="muted">{formatDistance(g.distanceKm)}</span>
                 </div>
@@ -101,10 +103,15 @@ export default function ResultsPhase({ state, onNext }: Props) {
             <strong className="muted">Standings</strong>
             {state.players.map((p) => (
               <div key={p.id} className="player-row">
-                <span>
-                  {p.name}
-                  {p.id === state.youId && <span className="badge"> you</span>}
-                </span>
+                <div className="row" style={{ gap: 8 }}>
+                  <span className="roster-avatar" aria-hidden="true">
+                    <img className="emoji-img" src={emojiUrl(p.emoji)} alt="" />
+                  </span>
+                  <span>
+                    {p.name}
+                    {p.id === state.youId && <span className="badge"> you</span>}
+                  </span>
+                </div>
                 <strong>{p.totalScore.toLocaleString()}</strong>
               </div>
             ))}
