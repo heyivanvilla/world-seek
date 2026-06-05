@@ -101,18 +101,24 @@ export default function FindingPhase({ state, onGuess, onPreview }: Props) {
       <div className="split">
         <div style={{ position: "relative", background: "#000" }}>
           <div className="overlay-top overlay-top--emoji">
-            {state.currentTarget && (
-              <span className="emoji-inline" aria-hidden="true">
-                <img
-                  className="emoji-img"
-                  src={emojiUrl(state.currentTarget.emoji)}
-                  alt=""
-                />
-              </span>
+            {state.solo ? (
+              <span>Where in the world is this? 🌍</span>
+            ) : (
+              <>
+                {state.currentTarget && (
+                  <span className="emoji-inline" aria-hidden="true">
+                    <img
+                      className="emoji-img"
+                      src={emojiUrl(state.currentTarget.emoji)}
+                      alt=""
+                    />
+                  </span>
+                )}
+                <span>
+                  Where is <strong>{state.currentTarget?.name}</strong> hiding?
+                </span>
+              </>
             )}
-            <span>
-              Where is <strong>{state.currentTarget?.name}</strong> hiding?
-            </span>
           </div>
           <StreetView mode="pano" panoId={state.currentTarget?.panoId} />
         </div>

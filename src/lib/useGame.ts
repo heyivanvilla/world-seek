@@ -176,6 +176,12 @@ export function useGame(code: string) {
     (at: LatLng) => dispatch("guess:confirm", at),
     [dispatch],
   );
+  // Solo: the browser generated a location; seed the round with it. Goes through
+  // dispatch so it survives a dropped/stale seat like every other action.
+  const sendSoloTarget = useCallback(
+    (spot: HidingSpot) => dispatch("solo:target", spot),
+    [dispatch],
+  );
   // Stream an in-progress pin to watchers. Best-effort and high-frequency, so it
   // skips the dispatch park/replay machinery — a preview lost to a blip is just a
   // dropped frame, and the eventual guess:confirm is what actually matters.
@@ -199,6 +205,7 @@ export function useGame(code: string) {
     start,
     hide,
     guess,
+    sendSoloTarget,
     previewGuess,
     nextRound,
     returnToLobby,

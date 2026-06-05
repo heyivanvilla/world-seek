@@ -24,9 +24,11 @@ export default function FinalScores({ state, onReturnToLobby }: Props) {
             🏆 Game over
           </h1>
           <p className="muted" style={{ margin: 0 }}>
-            {winners.length === 1
-              ? `${winners[0].name} wins!`
-              : `It's a tie: ${winners.map((w) => w.name).join(", ")}`}
+            {state.solo
+              ? `You scored ${topScore.toLocaleString()} points!`
+              : winners.length === 1
+                ? `${winners[0].name} wins!`
+                : `It's a tie: ${winners.map((w) => w.name).join(", ")}`}
           </p>
         </div>
 

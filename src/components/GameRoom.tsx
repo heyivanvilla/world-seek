@@ -5,6 +5,7 @@ import JoinForm from "./JoinForm";
 import Lobby from "./Lobby";
 import HidingPhase from "./HidingPhase";
 import FindingPhase from "./FindingPhase";
+import SoloLoading from "./SoloLoading";
 import ResultsPhase from "./ResultsPhase";
 import FinalScores from "./FinalScores";
 
@@ -39,6 +40,12 @@ export default function GameRoom({ code }: { code: string }) {
       case "hiding":
         return <HidingPhase state={s} onHide={game.hide} />;
       case "finding":
+        // Solo rounds open with no location until the browser generates one.
+        if (s.solo && !s.currentTarget) {
+          return (
+            <SoloLoading key={s.currentRound} onTarget={game.sendSoloTarget} />
+          );
+        }
         return (
           <FindingPhase
             key={s.currentRound}

@@ -24,11 +24,13 @@ export function createRoom(
   const room: Room = {
     code: generateRoomCode(),
     phase: "lobby",
+    mode: "multiplayer",
     settings: { ...DEFAULT_SETTINGS, ...settings },
     gameMasterId: player.id,
     players: [player],
     order: [],
     currentRound: 0,
+    targets: [],
   };
   return { room, player };
 }
@@ -97,7 +99,11 @@ export function connectedPlayers(room: Room): Player[] {
 
 export function startGame(room: Room): boolean {
   if (room.phase !== "lobby") return false;
+  // A lone host plays solo; the mode is decided here (server-authoritative) so a
+  // client can never force solo while other players are connected.
+  if (connectedPlayers(room).length === 1) return startSolo(room);
   if (connectedPlayers(room).length < 2) return false;
+  room.mode = "multiplayer";
   room.phase = "hiding";
   for (const p of room.players) {
     p.hiding = null;
@@ -219,7 +225,9 @@ export function nextRound(room: Room): boolean {
 
 export function returnToLobby(room: Room): boolean {
   room.phase = "lobby";
+  room.mode = "multiplayer";
   room.order = [];
+  room.targets = [];
   room.currentRound = 0;
   for (const p of room.players) {
     p.hiding = null;
@@ -227,6 +235,91 @@ export function returnToLobby(room: Room): boolean {
     p.guesses = {};
     p.livePin = null;
     p.totalScore = 0;
+  }
+  return true;
+}
+
+// --- solo mode -------------------------------------------------------------
+// Solo inverts the model: the *system* picks the location (sent up from the lone
+// player's browser, which is the only place with Google Street View access) and
+// the player guesses it. The human stays the only entry in room.players; the
+// per-round location lives in room.targets so a refresh restores it.
+
+/** Synthetic key under which a solo round's guess is stored on the player. */
+function soloTargetKey(round: number): string {
+  return `solo-${round}`;
+}
+
+/** lobby -> finding (solo). The first target is generated client-side next. */
+export function startSolo(room: Room): boolean {
+  if (room.phase !== "lobby") return false;
+  if (connectedPlayers(room).length !== 1) return false;
+  room.mode = "solo";
+  room.phase = "finding";
+  room.order = [];
+  room.targets = [];
+  room.currentRound = 0;
+  for (const p of room.players) {
+    p.hiding = null;
+    p.hasHidden = false;
+    p.guesses = {};
+    p.totalScore = 0;
+  }
+  return true;
+}
+
+/** Store the system-picked location for the current solo round (idempotent). */
+export function recordSoloTarget(room: Room, spot: HidingSpot): boolean {
+  if (room.mode !== "solo" || room.phase !== "finding") return false;
+  // Only the first generation for a round counts, so a late second resolve can't
+  // swap the location out from under a guess already in progress.
+  if (room.targets[room.currentRound]) return false;
+  room.targets[room.currentRound] = spot;
+  return true;
+}
+
+/** The location the solo player is currently guessing (or null until generated). */
+export function soloTarget(room: Room): HidingSpot | null {
+  if (room.mode !== "solo") return null;
+  return room.targets[room.currentRound] ?? null;
+}
+
+export function recordSoloGuess(room: Room, playerId: string, at: LatLng): boolean {
+  if (room.mode !== "solo" || room.phase !== "finding") return false;
+  const target = room.targets[room.currentRound];
+  if (!target) return false;
+  const player = findPlayer(room, playerId);
+  if (!player) return false;
+  const distanceKm = haversineKm(at, target);
+  const points = computeScore(distanceKm, room.settings);
+  player.guesses[soloTargetKey(room.currentRound)] = { ...at, distanceKm, points };
+  return true;
+}
+
+/** The solo player's guess for this round, if they've placed one. */
+export function soloGuess(room: Room, playerId: string) {
+  const player = findPlayer(room, playerId);
+  return player?.guesses[soloTargetKey(room.currentRound)] ?? null;
+}
+
+/** Tally the solo round's points and move to results (one guesser, no waiting). */
+export function scoreSoloRound(room: Room, playerId: string): boolean {
+  if (room.mode !== "solo" || room.phase !== "finding") return false;
+  const player = findPlayer(room, playerId);
+  const g = player?.guesses[soloTargetKey(room.currentRound)];
+  if (!player || !g) return false;
+  player.totalScore += g.points;
+  room.phase = "results";
+  return true;
+}
+
+export function nextSoloRound(room: Room): boolean {
+  if (room.mode !== "solo" || room.phase !== "results") return false;
+  if (room.currentRound + 1 >= room.settings.soloRounds) {
+    room.phase = "finished";
+  } else {
+    room.currentRound += 1;
+    room.phase = "finding"; // targets[currentRound] empty -> client regenerates
   }
   return true;
 }
