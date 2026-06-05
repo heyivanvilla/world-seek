@@ -35,6 +35,16 @@ export default function FindingPhase({ state, onGuess, onPreview }: Props) {
     },
     [],
   );
+
+  // Round advanced. This component now persists across rounds (see GameRoom — it
+  // is no longer keyed/remounted, so the map + Street View instances are reused
+  // rather than rebuilt), so the remount no longer clears per-round view state.
+  // Reset it by hand: drop the working guess and cancel any pending preview emit
+  // so a stale pin from the previous round can't leak into the next one.
+  useEffect(() => {
+    setGuess(null);
+    if (trailing.current) clearTimeout(trailing.current);
+  }, [state.currentRound]);
   const sendPreview = useCallback((at: LatLng) => {
     const wait = PREVIEW_THROTTLE_MS - (Date.now() - lastSent.current);
     if (wait <= 0) {
@@ -129,6 +139,7 @@ export default function FindingPhase({ state, onGuess, onPreview }: Props) {
             onChange={handleChange}
             onDrag={(p) => sendPreview(p)}
             markerIcon={state.youEmoji}
+            resetViewKey={state.currentRound}
           />
         </div>
       </div>
