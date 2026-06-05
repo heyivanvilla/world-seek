@@ -6,6 +6,10 @@ import { EARTHY_MAP_STYLE } from "@/lib/mapStyle";
 import { createImageMarker, type ImageMarker } from "@/lib/ImageMarkerOverlay";
 import type { LatLng } from "@/shared/types";
 
+// The world-overview the guess map opens on (and returns to each new round).
+const DEFAULT_CENTER = { lat: 20, lng: 0 };
+const DEFAULT_ZOOM = 2;
+
 export interface MapMarker extends LatLng {
   id?: string; // stable identity -> reconciled in place (no flicker) on rapid updates
   icon?: string; // emoji id -> rendered as an <img> overlay (animates GIFs)
@@ -35,6 +39,12 @@ interface Props {
   fitToContent?: boolean;
   /** Overlay the blue Street View coverage layer (zoom in to see the streets). */
   coverage?: boolean;
+  /**
+   * When this value changes, snap the map back to the default world view. Lets a
+   * persisted map (one reused across rounds, rather than remounted) start each
+   * round fresh instead of holding the previous round's pan/zoom.
+   */
+  resetViewKey?: string | number;
   className?: string;
 }
 
@@ -47,6 +57,7 @@ export default function MapPicker({
   lines,
   fitToContent,
   coverage,
+  resetViewKey,
   className,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -69,8 +80,8 @@ export default function MapPicker({
     loadGoogleMaps().then((google) => {
       if (cancelled || !ref.current || mapRef.current) return;
       const map = new google.maps.Map(ref.current, {
-        center: { lat: 20, lng: 0 },
-        zoom: 2,
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
         minZoom: 2,
         // Color of the map div behind the tiles — visible in the void past the
         // edges of the world when zoomed out. Match the water tone so it blends.
@@ -111,6 +122,15 @@ export default function MapPicker({
       coverageRef.current = null;
     }
   }, [ready, coverage]);
+
+  // --- snap back to the world view when the caller bumps resetViewKey ---
+  // Only active when the prop is provided (e.g. the per-round guess map), so
+  // maps that manage their own framing (fitToContent results map) are untouched.
+  useEffect(() => {
+    if (!ready || !mapRef.current || resetViewKey === undefined) return;
+    mapRef.current.setCenter(DEFAULT_CENTER);
+    mapRef.current.setZoom(DEFAULT_ZOOM);
+  }, [ready, resetViewKey]);
 
   // --- sync the user's draggable pin (their emoji when markerIcon is set) ---
   useEffect(() => {

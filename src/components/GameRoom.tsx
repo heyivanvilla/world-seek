@@ -47,18 +47,21 @@ export default function GameRoom({ code }: { code: string }) {
             <SoloLoading key={s.currentRound} onTarget={game.sendSoloTarget} />
           );
         }
+        // No key on currentRound here on purpose: keying would remount the
+        // phase every round, tearing down and re-instantiating the underlying
+        // google.maps.Map / StreetViewPanorama — each a billable Maps load. By
+        // persisting the component, the same map/pano instances are reused and
+        // just updated (setPano, recenter, new markers) as the round changes.
+        // The phases reset their own per-round view state internally instead.
         return (
           <FindingPhase
-            key={s.currentRound}
             state={s}
             onGuess={game.guess}
             onPreview={game.previewGuess}
           />
         );
       case "results":
-        return (
-          <ResultsPhase key={s.currentRound} state={s} onNext={game.nextRound} />
-        );
+        return <ResultsPhase state={s} onNext={game.nextRound} />;
       case "finished":
         return <FinalScores state={s} onReturnToLobby={game.returnToLobby} />;
     }
