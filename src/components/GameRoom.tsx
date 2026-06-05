@@ -1,7 +1,7 @@
 "use client";
 
 import { useGame } from "@/lib/useGame";
-import ExitControl from "./ExitControl";
+import GameMenu from "./GameMenu";
 import JoinForm from "./JoinForm";
 import Lobby from "./Lobby";
 import HidingPhase from "./HidingPhase";
@@ -67,9 +67,10 @@ export default function GameRoom({ code }: { code: string }) {
   return (
     <>
       {phase}
-      {/* Exit/leave control, present in every in-game phase. The host closes the
-          game for everyone; everyone else just leaves and the rest keep playing. */}
-      <ExitControl
+      {/* Top-right menu, present in every in-game phase. Houses the exit/leave
+          action: the host closes the game for everyone; everyone else just
+          leaves and the rest keep playing. */}
+      <GameMenu
         isGameMaster={s.youAreGameMaster}
         onLeave={game.leave}
         onClose={game.close}
