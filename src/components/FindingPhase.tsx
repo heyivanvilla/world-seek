@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import type { LatLng, PublicState } from "@/shared/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { LatLng, PublicPlayer, PublicState } from "@/shared/types";
 import { emojiUrl } from "@/shared/emojis";
-import MapPicker from "./MapPicker";
+import MapPicker, { type MapMarker } from "./MapPicker";
 import StreetView from "./StreetView";
 import PlayerList from "./PlayerList";
 import WaitingBar from "./WaitingBar";
@@ -11,52 +11,89 @@ import WaitingBar from "./WaitingBar";
 interface Props {
   state: PublicState;
   onGuess: (at: LatLng) => void;
+  onPreview: (at: LatLng) => void;
 }
 
-export default function FindingPhase({ state, onGuess }: Props) {
+// Cap how often a moving pin is broadcast so a drag doesn't flood the socket.
+const PREVIEW_THROTTLE_MS = 100;
+// Tentative (un-confirmed) pins render see-through; confirmed ones go solid.
+const TENTATIVE_OPACITY = 0.4;
+
+export default function FindingPhase({ state, onGuess, onPreview }: Props) {
   const [guess, setGuess] = useState<LatLng | null>(null);
   const roundLabel = `Round ${state.currentRound + 1} of ${state.totalRounds}`;
 
-  // --- it's your spot being guessed: sit out ---
+  // Throttle live-pin broadcasts (leading + trailing edge) so continuous drags
+  // stream smoothly without emitting on every pointer move.
+  const lastSent = useRef(0);
+  const trailing = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onPreviewRef = useRef(onPreview);
+  onPreviewRef.current = onPreview;
+  useEffect(
+    () => () => {
+      if (trailing.current) clearTimeout(trailing.current);
+    },
+    [],
+  );
+  const sendPreview = useCallback((at: LatLng) => {
+    const wait = PREVIEW_THROTTLE_MS - (Date.now() - lastSent.current);
+    if (wait <= 0) {
+      lastSent.current = Date.now();
+      onPreviewRef.current(at);
+    } else {
+      if (trailing.current) clearTimeout(trailing.current);
+      trailing.current = setTimeout(() => {
+        lastSent.current = Date.now();
+        onPreviewRef.current(at);
+      }, wait);
+    }
+  }, []);
+
+  // The other hunters' live pins, for the watch views below.
+  const liveMarkers: MapMarker[] = state.livePins.map((g) => ({
+    id: g.playerId,
+    lat: g.lat,
+    lng: g.lng,
+    icon: g.emoji,
+    opacity: g.confirmed ? 1 : TENTATIVE_OPACITY,
+    title: g.name,
+  }));
+
+  // --- it's your spot being guessed: watch everyone close in ---
   if (state.youAreTarget) {
     return (
-      <div className="center-screen">
-        <div className="stack" style={{ width: 420, gap: 18 }}>
-          <span className="muted">{roundLabel}</span>
-          <h1 className="title">Everyone's hunting for you 🔎</h1>
-          <p className="muted" style={{ margin: 0 }}>
-            Sit tight while the others guess your hiding spot.
-          </p>
-          <div className="card stack">
-            <WaitingBar
-              label="Guesses in"
-              current={state.guessedCount}
-              total={state.expectedGuessers}
-            />
-          </div>
-        </div>
-      </div>
+      <WatchView
+        roundLabel={roundLabel}
+        title="Everyone's hunting for you 🔎"
+        emptyHint="Sit tight while the others guess your hiding spot."
+        markers={liveMarkers}
+        current={state.guessedCount}
+        total={state.expectedGuessers}
+      />
     );
   }
 
-  // --- already guessed this round: waiting view ---
+  // --- already guessed this round: follow the rest of the hunt ---
   if (state.youHaveGuessed) {
     return (
-      <div className="center-screen">
-        <div className="stack" style={{ width: 420, gap: 18 }}>
-          <span className="muted">{roundLabel}</span>
-          <h1 className="title">Guess locked in ✅</h1>
-          <div className="card stack">
-            <WaitingBar
-              label="Guesses in"
-              current={state.guessedCount}
-              total={state.expectedGuessers}
-            />
-            <PlayerList players={state.players} />
-          </div>
-        </div>
-      </div>
+      <WatchView
+        roundLabel={roundLabel}
+        title="Guess locked in ✅"
+        emptyHint="Waiting for the other hunters to lock in."
+        markers={liveMarkers}
+        current={state.guessedCount}
+        total={state.expectedGuessers}
+        players={state.players}
+      />
     );
+  }
+
+  // --- active guesser ---
+  // Click / drag-end set the working guess and stream a preview; the continuous
+  // onDrag streams previews only (no re-render churn) for live motion.
+  function handleChange(p: LatLng) {
+    setGuess(p);
+    sendPreview(p);
   }
 
   return (
@@ -81,7 +118,12 @@ export default function FindingPhase({ state, onGuess }: Props) {
         </div>
         <div style={{ position: "relative" }}>
           <div className="overlay-top">{roundLabel} · drop your guess</div>
-          <MapPicker value={guess} onChange={setGuess} markerIcon={state.youEmoji} />
+          <MapPicker
+            value={guess}
+            onChange={handleChange}
+            onDrag={(p) => sendPreview(p)}
+            markerIcon={state.youEmoji}
+          />
         </div>
       </div>
 
@@ -91,6 +133,67 @@ export default function FindingPhase({ state, onGuess }: Props) {
         <button onClick={() => guess && onGuess(guess)} disabled={!guess}>
           Guess here
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Shown to players who can no longer guess this round (the target, or anyone
+ * already locked in): a live map of the other hunters' pins. Tentative pins are
+ * see-through and snap solid on confirm. Falls back to a simple waiting card
+ * until the first pin appears.
+ */
+function WatchView({
+  roundLabel,
+  title,
+  emptyHint,
+  markers,
+  current,
+  total,
+  players,
+}: {
+  roundLabel: string;
+  title: string;
+  emptyHint: string;
+  markers: MapMarker[];
+  current: number;
+  total: number;
+  players?: PublicPlayer[];
+}) {
+  if (markers.length === 0) {
+    return (
+      <div className="center-screen">
+        <div className="stack" style={{ width: 420, gap: 18 }}>
+          <span className="muted">{roundLabel}</span>
+          <h1 className="title">{title}</h1>
+          <p className="muted" style={{ margin: 0 }}>
+            {emptyHint}
+          </p>
+          <div className="card stack">
+            <WaitingBar label="Guesses in" current={current} total={total} />
+            {players && <PlayerList players={players} />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="full-bleed">
+      <div className="map-wrap">
+        <div className="overlay-top">
+          <strong>{title}</strong>
+          <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+            {roundLabel} · pins glow solid when locked in
+          </div>
+        </div>
+        <MapPicker markers={markers} />
+      </div>
+      <div className="overlay-bar">
+        <div style={{ minWidth: 220 }}>
+          <WaitingBar label="Guesses in" current={current} total={total} />
+        </div>
       </div>
     </div>
   );

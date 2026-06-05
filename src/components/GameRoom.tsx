@@ -40,7 +40,12 @@ export default function GameRoom({ code }: { code: string }) {
         return <HidingPhase state={s} onHide={game.hide} />;
       case "finding":
         return (
-          <FindingPhase key={s.currentRound} state={s} onGuess={game.guess} />
+          <FindingPhase
+            key={s.currentRound}
+            state={s}
+            onGuess={game.guess}
+            onPreview={game.previewGuess}
+          />
         );
       case "results":
         return (
