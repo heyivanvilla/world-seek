@@ -56,11 +56,19 @@ export default function ResultsPhase({ state, onNext }: Props) {
       <div className="split">
         <div style={{ position: "relative" }}>
           <div className="overlay-top overlay-top--emoji">
-            <span className="emoji-inline" aria-hidden="true">
-              <img className="emoji-img" src={emojiUrl(result.targetEmoji)} alt="" />
-            </span>
+            {!state.solo && (
+              <span className="emoji-inline" aria-hidden="true">
+                <img className="emoji-img" src={emojiUrl(result.targetEmoji)} alt="" />
+              </span>
+            )}
             <span>
-              <strong>{result.targetName}</strong> was hiding here 📍
+              {state.solo ? (
+                <>This was the spot 📍</>
+              ) : (
+                <>
+                  <strong>{result.targetName}</strong> was hiding here 📍
+                </>
+              )}
             </span>
           </div>
           <MapPicker markers={markers} lines={lines} fitToContent />

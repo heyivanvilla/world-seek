@@ -7,12 +7,21 @@ export interface Settings {
   maxPoints: number;
   /** Distance (km) controlling how fast the score decays. Larger = more forgiving. */
   scoreScaleKm: number;
+  /** Number of rounds in a solo game (the game picks one location per round). */
+  soloRounds: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   maxPoints: 5000,
   scoreScaleKm: 2000,
+  soloRounds: 5,
 };
+
+/**
+ * "multiplayer" = the classic hide & seek (players hide, others guess).
+ * "solo" = the game picks a random location each round and the lone player guesses.
+ */
+export type GameMode = "solo" | "multiplayer";
 
 export interface LatLng {
   lat: number;
@@ -44,17 +53,22 @@ export interface Player {
   hiding: HidingSpot | null; // secret until results
   hasHidden: boolean;
   guesses: Record<string, Guess>; // targetPlayerId -> this player's guess
+  // Current-round in-progress pin, streamed to watchers as they place/drag it.
+  // Cleared on confirm; validated against the live target so it can't bleed rounds.
+  livePin: { targetId: string; lat: number; lng: number } | null;
   totalScore: number;
 }
 
 export interface Room {
   code: string;
   phase: Phase;
+  mode: GameMode; // decided at game:start (solo when the host is alone)
   settings: Settings;
   gameMasterId: string;
   players: Player[];
-  order: string[]; // shuffled player ids being guessed, one per round
-  currentRound: number; // index into order
+  order: string[]; // shuffled player ids being guessed, one per round (multiplayer)
+  currentRound: number; // index into order (multiplayer) or 0..soloRounds-1 (solo)
+  targets: HidingSpot[]; // solo only: the system-picked location per round
 }
 
 // ---------------------------------------------------------------------------
@@ -94,9 +108,22 @@ export interface RoundResult {
   guesses: PublicGuess[];
 }
 
+/**
+ * A live "follow-along" pin shown to watchers (the target + already-guessed
+ * players) during the finding phase. Only ever sent to people who can no longer
+ * guess this round, so it can't be used to copy positions.
+ */
+export interface LiveGuess extends LatLng {
+  playerId: string;
+  name: string;
+  emoji: string;
+  confirmed: boolean; // false = still placing (transparent), true = locked in (solid)
+}
+
 export interface PublicState {
   code: string;
   phase: Phase;
+  solo: boolean; // true when this is a single-player game (system-picked locations)
   settings: Settings;
   gameMasterId: string;
   players: PublicPlayer[];
@@ -118,6 +145,9 @@ export interface PublicState {
   youHaveGuessed: boolean;
   guessedCount: number;
   expectedGuessers: number;
+  // Live pins of the other hunters — populated only for watchers (target or
+  // already-guessed); empty for active guessers and outside the finding phase.
+  livePins: LiveGuess[];
 
   // results phase
   result: RoundResult | null;

@@ -27,11 +27,16 @@ import {
   findByToken,
   findPlayer,
   nextRound,
+  nextSoloRound,
   recordGuess,
   recordHide,
+  recordLivePin,
+  recordSoloGuess,
+  recordSoloTarget,
   removePlayer,
   returnToLobby,
   scoreRound,
+  scoreSoloRound,
   startFinding,
   startGame,
   takenEmojis,
@@ -178,9 +183,38 @@ export function registerHandlers(io: Server): void {
       reply(cb, { ok: true });
     });
 
+    // Solo: the lone player's browser resolves a random Street View location (the
+    // server has no Google access of its own) and sends it up to seed the round.
+    socket.on("solo:target", (spot: HidingSpot, cb?: AckFn) => {
+      const s = seat(socket);
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (!recordSoloTarget(s.room, spot))
+        return reply(cb, { ok: false, reason: "rejected" });
+      broadcastState(io, s.room);
+      reply(cb, { ok: true });
+    });
+
+    // A guesser's pin moving in real time — broadcast to watchers (the target +
+    // already-guessed players). High-frequency and best-effort: no ack/replay,
+    // throttled on the client. A dropped preview just means a skipped frame.
+    socket.on("guess:preview", (at: LatLng) => {
+      const s = seat(socket);
+      if (!s) return;
+      if (!recordLivePin(s.room, s.playerId, at)) return;
+      broadcastState(io, s.room);
+    });
+
     socket.on("guess:confirm", (at: LatLng, cb?: AckFn) => {
       const s = seat(socket);
       if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (s.room.mode === "solo") {
+        // One guesser, no waiting: a successful guess ends the round immediately.
+        if (!recordSoloGuess(s.room, s.playerId, at))
+          return reply(cb, { ok: false, reason: "rejected" });
+        scoreSoloRound(s.room, s.playerId);
+        broadcastState(io, s.room);
+        return reply(cb, { ok: true });
+      }
       if (!recordGuess(s.room, s.playerId, at))
         return reply(cb, { ok: false, reason: "rejected" });
       if (allGuessed(s.room)) scoreRound(s.room);
@@ -191,7 +225,8 @@ export function registerHandlers(io: Server): void {
     socket.on("round:next", (cb?: AckFn) => {
       const s = seat(socket);
       if (!s) return reply(cb, { ok: false, reason: "not_seated" });
-      if (!isGameMaster(s.room, s.playerId) || !nextRound(s.room))
+      const advance = s.room.mode === "solo" ? nextSoloRound : nextRound;
+      if (!isGameMaster(s.room, s.playerId) || !advance(s.room))
         return reply(cb, { ok: false, reason: "rejected" });
       broadcastState(io, s.room);
       reply(cb, { ok: true });
