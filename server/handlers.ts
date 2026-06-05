@@ -178,6 +178,11 @@ export function registerHandlers(io: Server): void {
       if (player && player.socketId === socket.id) {
         player.connected = false;
         player.socketId = null;
+        // A disconnect can unblock a waiting phase: if everyone still connected
+        // has already confirmed, advance automatically rather than leaving the
+        // game stuck waiting for a player who just left.
+        if (room.phase === "hiding" && allConnectedHidden(room)) startFinding(room);
+        else if (room.phase === "finding" && allGuessed(room)) scoreRound(room);
         broadcastState(io, room);
       }
     });
