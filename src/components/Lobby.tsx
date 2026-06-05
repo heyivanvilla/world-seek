@@ -12,7 +12,9 @@ interface Props {
 export default function Lobby({ state, onStart }: Props) {
   const [copied, setCopied] = useState(false);
   const isGM = state.youAreGameMaster;
-  const enoughPlayers = state.players.length >= 2;
+  // Alone in the room? Starting runs a solo game (the server decides the mode by
+  // connected count, so this label is just a hint — it can't force solo).
+  const isSolo = state.players.length < 2;
 
   function copyLink() {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -41,16 +43,22 @@ export default function Lobby({ state, onStart }: Props) {
         <div className="card stack">
           <div className="row" style={{ justifyContent: "space-between" }}>
             <span className="eyebrow">Players ({state.players.length})</span>
-            <span className="muted">2–12 players</span>
+            <span className="muted">1 solo · 2–12 multiplayer</span>
           </div>
           <PlayerList players={state.players} />
         </div>
 
         {isGM ? (
           <div className="card stack">
-            <button onClick={onStart} disabled={!enoughPlayers}>
-              {enoughPlayers ? "Start game" : "Need at least 2 players"}
+            <button onClick={onStart}>
+              {isSolo ? "Play solo" : "Start game"}
             </button>
+            {isSolo && (
+              <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                No one else here — you'll guess random spots the game picks. Invite
+                someone to play head-to-head instead.
+              </p>
+            )}
           </div>
         ) : (
           <div className="card">

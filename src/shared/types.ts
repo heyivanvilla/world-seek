@@ -7,12 +7,21 @@ export interface Settings {
   maxPoints: number;
   /** Distance (km) controlling how fast the score decays. Larger = more forgiving. */
   scoreScaleKm: number;
+  /** Number of rounds in a solo game (the game picks one location per round). */
+  soloRounds: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   maxPoints: 5000,
   scoreScaleKm: 2000,
+  soloRounds: 5,
 };
+
+/**
+ * "multiplayer" = the classic hide & seek (players hide, others guess).
+ * "solo" = the game picks a random location each round and the lone player guesses.
+ */
+export type GameMode = "solo" | "multiplayer";
 
 export interface LatLng {
   lat: number;
@@ -50,11 +59,13 @@ export interface Player {
 export interface Room {
   code: string;
   phase: Phase;
+  mode: GameMode; // decided at game:start (solo when the host is alone)
   settings: Settings;
   gameMasterId: string;
   players: Player[];
-  order: string[]; // shuffled player ids being guessed, one per round
-  currentRound: number; // index into order
+  order: string[]; // shuffled player ids being guessed, one per round (multiplayer)
+  currentRound: number; // index into order (multiplayer) or 0..soloRounds-1 (solo)
+  targets: HidingSpot[]; // solo only: the system-picked location per round
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +108,7 @@ export interface RoundResult {
 export interface PublicState {
   code: string;
   phase: Phase;
+  solo: boolean; // true when this is a single-player game (system-picked locations)
   settings: Settings;
   gameMasterId: string;
   players: PublicPlayer[];

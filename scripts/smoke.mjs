@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const URL = "http://localhost:3000";
+const URL = process.env.SMOKE_URL || "http://localhost:3000";
 const log = (...a) => console.log(...a);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -43,12 +43,13 @@ await Promise.all(
   [a, b, c].map((s) => new Promise((r) => s.on("connect", r))),
 );
 
-const created = await emitAck(a, "game:create", { gmName: "Alice" });
+const created = await emitAck(a, "game:create", { gmName: "Alice", gmEmoji: "02-dance" });
 check("create returns code", !!created.code);
 const code = created.code;
 
-const jb = await emitAck(b, "game:join", { code, name: "Bob" });
-const jc = await emitAck(c, "game:join", { code, name: "Cara" });
+// Distinct emojis: avatars are unique per room, so each player picks their own.
+const jb = await emitAck(b, "game:join", { code, name: "Bob", emoji: "0cat" });
+const jc = await emitAck(c, "game:join", { code, name: "Cara", emoji: "17j9j" });
 check("Bob joined", jb.ok === true);
 check("Cara joined", jc.ok === true);
 
@@ -146,6 +147,65 @@ const recBad = await emitAck(connect(), "game:reconnect", {
   sessionToken: "nope",
 });
 check("reconnect bad token rejected", recBad.ok === false);
+
+// --- solo mode: one player, game-picked locations -------------------------
+// We inject solo:target with fixed spots (the browser would normally resolve
+// these via Google Street View, which Node can't reach) to drive the full loop.
+const solo = connect();
+await new Promise((r) => solo.on("connect", r));
+const soloCreated = await emitAck(solo, "game:create", { gmName: "Solo" });
+const soloCode = soloCreated.code;
+
+let sS = await nextState(solo, (s) => s.code === soloCode);
+check("solo lobby starts multiplayer-flagged off", sS.phase === "lobby" && sS.solo === false);
+
+solo.emit("game:start");
+sS = await nextState(solo, (s) => s.phase === "finding");
+check("lone host starts a solo game", sS.solo === true);
+check("solo uses soloRounds as total", sS.totalRounds === sS.settings.soloRounds);
+
+const soloSpots = [
+  { lat: 40.758, lng: -73.9855, panoId: "solo-pano-A" },
+  { lat: 48.8584, lng: 2.2945, panoId: "solo-pano-B" },
+];
+const soloRounds = sS.settings.soloRounds;
+for (let round = 0; round < soloRounds; round++) {
+  sS = await nextState(
+    solo,
+    (s) => s.phase === "finding" && s.currentRound === round,
+  );
+  check(`solo round ${round + 1} awaits a generated target`, sS.currentTarget === null);
+
+  solo.emit("solo:target", soloSpots[round % soloSpots.length]);
+  sS = await nextState(
+    solo,
+    (s) => s.currentTarget != null && s.currentRound === round,
+  );
+  check(
+    `solo round ${round + 1} sends pano without coords`,
+    !!sS.currentTarget?.panoId && sS.currentTarget.lat === undefined,
+  );
+
+  solo.emit("guess:confirm", { lat: 41, lng: -74 });
+  const r = await nextState(
+    solo,
+    (s) => s.phase === "results" && s.currentRound === round,
+  );
+  check(
+    `solo round ${round + 1} reveals coords + one guess`,
+    typeof r.result?.real?.lat === "number" && r.result.guesses.length === 1,
+  );
+
+  solo.emit("round:next");
+}
+
+const soloFin = await nextState(solo, (s) => s.phase === "finished");
+check("solo game finishes after soloRounds", soloFin.phase === "finished");
+check("solo score totaled", soloFin.players[0].totalScore > 0);
+
+solo.emit("game:returnToLobby");
+const soloBack = await nextState(solo, (s) => s.phase === "lobby");
+check("solo returns to lobby (mode reset)", soloBack.phase === "lobby" && soloBack.solo === false);
 
 log(`\n${failures === 0 ? "ALL PASS ✅" : failures + " FAILURE(S) ❌"}`);
 process.exit(failures === 0 ? 0 : 1);

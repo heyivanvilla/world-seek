@@ -176,6 +176,12 @@ export function useGame(code: string) {
     (at: LatLng) => dispatch("guess:confirm", at),
     [dispatch],
   );
+  // Solo: the browser generated a location; seed the round with it. Goes through
+  // dispatch so it survives a dropped/stale seat like every other action.
+  const sendSoloTarget = useCallback(
+    (spot: HidingSpot) => dispatch("solo:target", spot),
+    [dispatch],
+  );
   const nextRound = useCallback(() => dispatch("round:next"), [dispatch]);
   const returnToLobby = useCallback(
     () => dispatch("game:returnToLobby"),
@@ -192,6 +198,7 @@ export function useGame(code: string) {
     start,
     hide,
     guess,
+    sendSoloTarget,
     nextRound,
     returnToLobby,
   };
