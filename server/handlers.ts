@@ -27,6 +27,7 @@ import {
   nextRound,
   recordGuess,
   recordHide,
+  recordLivePin,
   returnToLobby,
   scoreRound,
   startFinding,
@@ -162,6 +163,16 @@ export function registerHandlers(io: Server): void {
       if (allConnectedHidden(s.room)) startFinding(s.room);
       broadcastState(io, s.room);
       reply(cb, { ok: true });
+    });
+
+    // A guesser's pin moving in real time — broadcast to watchers (the target +
+    // already-guessed players). High-frequency and best-effort: no ack/replay,
+    // throttled on the client. A dropped preview just means a skipped frame.
+    socket.on("guess:preview", (at: LatLng) => {
+      const s = seat(socket);
+      if (!s) return;
+      if (!recordLivePin(s.room, s.playerId, at)) return;
+      broadcastState(io, s.room);
     });
 
     socket.on("guess:confirm", (at: LatLng, cb?: AckFn) => {
