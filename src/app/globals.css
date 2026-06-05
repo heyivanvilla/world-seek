@@ -375,6 +375,15 @@ input:focus {
   }
 }
 
+/* Exit/leave button — pinned bottom-left, clear of the top overlays (.overlay-top,
+   .roster) and the bottom-center .overlay-bar. Sits above them so it's always tappable. */
+.exit-control {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 6;
+}
+
 .overlay-top {
   position: absolute;
   top: 16px;

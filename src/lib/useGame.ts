@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   ActionAck,
   HidingSpot,
@@ -32,6 +33,7 @@ function joinErrorMessage(err: JoinError): string {
 }
 
 export function useGame(code: string) {
+  const router = useRouter();
   const [state, setState] = useState<PublicState | null>(null);
   const [status, setStatus] = useState<GameStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -96,10 +98,16 @@ export function useGame(code: string) {
       setConnected(false);
       seated.current = false;
     };
+    // The host closed the room, or the game auto-ended — everyone goes home.
+    const onClosed = () => {
+      clearSession(code);
+      router.push("/");
+    };
 
     socket.on("state", onState);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("game:closed", onClosed);
 
     if (socket.connected) {
       setConnected(true);
@@ -110,8 +118,9 @@ export function useGame(code: string) {
       socket.off("state", onState);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("game:closed", onClosed);
     };
-  }, [code, flushPending]);
+  }, [code, flushPending, router]);
 
   // Send a game action, surviving a dropped or stale connection. If we aren't
   // seated we park it and (re)connect first; if the server reports our seat
@@ -195,6 +204,20 @@ export function useGame(code: string) {
     [dispatch],
   );
 
+  // Leave the game (the rest keep playing) and head home.
+  const leave = useCallback(() => {
+    getSocket().emit("game:leave");
+    clearSession(code);
+    router.push("/");
+  }, [code, router]);
+
+  // Host only: end the game for everyone and head home.
+  const close = useCallback(() => {
+    getSocket().emit("game:close");
+    clearSession(code);
+    router.push("/");
+  }, [code, router]);
+
   return {
     state,
     status,
@@ -209,5 +232,7 @@ export function useGame(code: string) {
     previewGuess,
     nextRound,
     returnToLobby,
+    leave,
+    close,
   };
 }
