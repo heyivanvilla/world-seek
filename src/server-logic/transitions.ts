@@ -156,7 +156,10 @@ export function recordGuess(room: Room, guesserId: string, at: LatLng): boolean 
 
 export function expectedGuessers(room: Room): Player[] {
   const targetId = currentTargetId(room);
-  return connectedPlayers(room).filter((p) => p.id !== targetId);
+  const orderSet = new Set(room.order);
+  return room.players.filter(
+    (p) => p.connected && orderSet.has(p.id) && p.id !== targetId,
+  );
 }
 
 export function allGuessed(room: Room): boolean {
