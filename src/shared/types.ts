@@ -53,6 +53,9 @@ export interface Player {
   hiding: HidingSpot | null; // secret until results
   hasHidden: boolean;
   guesses: Record<string, Guess>; // targetPlayerId -> this player's guess
+  // Current-round in-progress pin, streamed to watchers as they place/drag it.
+  // Cleared on confirm; validated against the live target so it can't bleed rounds.
+  livePin: { targetId: string; lat: number; lng: number } | null;
   totalScore: number;
 }
 
@@ -105,6 +108,18 @@ export interface RoundResult {
   guesses: PublicGuess[];
 }
 
+/**
+ * A live "follow-along" pin shown to watchers (the target + already-guessed
+ * players) during the finding phase. Only ever sent to people who can no longer
+ * guess this round, so it can't be used to copy positions.
+ */
+export interface LiveGuess extends LatLng {
+  playerId: string;
+  name: string;
+  emoji: string;
+  confirmed: boolean; // false = still placing (transparent), true = locked in (solid)
+}
+
 export interface PublicState {
   code: string;
   phase: Phase;
@@ -130,6 +145,9 @@ export interface PublicState {
   youHaveGuessed: boolean;
   guessedCount: number;
   expectedGuessers: number;
+  // Live pins of the other hunters — populated only for watchers (target or
+  // already-guessed); empty for active guessers and outside the finding phase.
+  livePins: LiveGuess[];
 
   // results phase
   result: RoundResult | null;

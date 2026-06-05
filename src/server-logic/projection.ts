@@ -1,5 +1,6 @@
 import type {
   CurrentTarget,
+  LiveGuess,
   PublicGuess,
   PublicPlayer,
   PublicState,
@@ -127,6 +128,43 @@ export function projectFor(room: Room, viewerId: string): PublicState {
     }
   }
 
+  // --- live "follow-along" pins (finding phase) ---
+  // Only watchers — the target, or anyone who already locked in — receive these,
+  // so an active guesser can never see (and copy) the others' positions.
+  let livePins: LiveGuess[] = [];
+  if (room.phase === "finding" && targetId) {
+    const viewerHasGuessed = !!viewer?.guesses[targetId];
+    if (youAreTarget || viewerHasGuessed) {
+      livePins = room.players
+        .map((p) => {
+          if (p.id === viewerId || p.id === targetId) return null;
+          const confirmed = p.guesses[targetId];
+          if (confirmed) {
+            return {
+              playerId: p.id,
+              name: p.name,
+              emoji: p.emoji,
+              lat: confirmed.lat,
+              lng: confirmed.lng,
+              confirmed: true,
+            } satisfies LiveGuess;
+          }
+          if (p.livePin?.targetId === targetId) {
+            return {
+              playerId: p.id,
+              name: p.name,
+              emoji: p.emoji,
+              lat: p.livePin.lat,
+              lng: p.livePin.lng,
+              confirmed: false,
+            } satisfies LiveGuess;
+          }
+          return null;
+        })
+        .filter((g): g is LiveGuess => g != null);
+    }
+  }
+
   const connected = connectedPlayers(room);
   const expected = expectedGuessers(room);
   const guessedCount = solo
@@ -160,6 +198,7 @@ export function projectFor(room: Room, viewerId: string): PublicState {
     youHaveGuessed: solo ? !!myGuess : !!(targetId && viewer?.guesses[targetId]),
     guessedCount,
     expectedGuessers: solo ? 1 : expected.length,
+    livePins,
 
     result,
   };

@@ -49,6 +49,7 @@ function newPlayer(name: string, isGameMaster: boolean, emoji?: string): Player 
     hiding: null,
     hasHidden: false,
     guesses: {},
+    livePin: null,
     totalScore: 0,
   };
 }
@@ -108,6 +109,7 @@ export function startGame(room: Room): boolean {
     p.hiding = null;
     p.hasHidden = false;
     p.guesses = {};
+    p.livePin = null;
     p.totalScore = 0;
   }
   return true;
@@ -157,6 +159,25 @@ export function recordGuess(room: Room, guesserId: string, at: LatLng): boolean 
   const distanceKm = haversineKm(at, target.hiding);
   const points = computeScore(distanceKm, room.settings);
   guesser.guesses[targetId] = { ...at, distanceKm, points };
+  // The tentative pin has become a solid guess — drop it so watchers see one pin.
+  guesser.livePin = null;
+  return true;
+}
+
+/**
+ * Record a guesser's in-progress (un-confirmed) pin for the current round so it
+ * can be streamed to watchers. Mirrors recordGuess's guards but scores nothing.
+ */
+export function recordLivePin(room: Room, guesserId: string, at: LatLng): boolean {
+  if (room.phase !== "finding") return false;
+  const targetId = currentTargetId(room);
+  if (!targetId || guesserId === targetId) return false;
+  const guesser = findPlayer(room, guesserId);
+  const target = findPlayer(room, targetId);
+  if (!guesser || !target || !target.hiding) return false;
+  // Ignore once they've locked in — their solid guess already represents them.
+  if (guesser.guesses[targetId]) return false;
+  guesser.livePin = { targetId, lat: at.lat, lng: at.lng };
   return true;
 }
 
@@ -212,6 +233,7 @@ export function returnToLobby(room: Room): boolean {
     p.hiding = null;
     p.hasHidden = false;
     p.guesses = {};
+    p.livePin = null;
     p.totalScore = 0;
   }
   return true;

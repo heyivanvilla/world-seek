@@ -47,7 +47,12 @@ export default function GameRoom({ code }: { code: string }) {
           );
         }
         return (
-          <FindingPhase key={s.currentRound} state={s} onGuess={game.guess} />
+          <FindingPhase
+            key={s.currentRound}
+            state={s}
+            onGuess={game.guess}
+            onPreview={game.previewGuess}
+          />
         );
       case "results":
         return (

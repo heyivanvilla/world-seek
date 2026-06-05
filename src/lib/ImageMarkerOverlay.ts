@@ -17,7 +17,11 @@ export interface ImageMarkerOptions {
   emoji: string;
   /** Square footprint in px. */
   size?: number;
+  /** 0..1 marker opacity (e.g. a tentative, un-confirmed pin). Defaults to 1. */
+  opacity?: number;
   draggable?: boolean;
+  /** Streamed continuously while the marker is being dragged. */
+  onDrag?: (p: LatLng) => void;
   onDragEnd?: (p: LatLng) => void;
   zIndex?: number;
 }
@@ -26,6 +30,7 @@ export interface ImageMarker {
   setMap(map: google.maps.Map | null): void;
   setPosition(p: LatLng): void;
   setEmoji(emoji: string): void;
+  setOpacity(o: number): void;
 }
 
 // The OverlayView subclass can only be defined once `google.maps` exists, so we
@@ -41,8 +46,10 @@ function buildClass(): new (opts: ImageMarkerOptions) => ImageMarker {
   class ImageMarkerOverlay extends google.maps.OverlayView implements ImageMarker {
     private position: LatLng;
     private emoji: string;
+    private opacity: number;
     private readonly size: number;
     private readonly draggable: boolean;
+    private readonly onDrag?: (p: LatLng) => void;
     private readonly onDragEnd?: (p: LatLng) => void;
     private readonly zIndex: number;
     private wrap: HTMLDivElement | null = null;
@@ -54,8 +61,10 @@ function buildClass(): new (opts: ImageMarkerOptions) => ImageMarker {
       super();
       this.position = o.position;
       this.emoji = o.emoji;
+      this.opacity = o.opacity ?? 1;
       this.size = o.size ?? 40;
       this.draggable = !!o.draggable;
+      this.onDrag = o.onDrag;
       this.onDragEnd = o.onDragEnd;
       this.zIndex = o.zIndex ?? 0;
     }
@@ -73,6 +82,9 @@ function buildClass(): new (opts: ImageMarkerOptions) => ImageMarker {
       wrap.style.pointerEvents = this.draggable ? "auto" : "none";
       wrap.style.cursor = this.draggable ? "grab" : "";
       wrap.style.filter = "drop-shadow(0 2px 3px rgba(0,0,0,0.45))";
+      wrap.style.opacity = String(this.opacity);
+      // Ease opacity so a tentative pin "snaps" smoothly to solid on confirm.
+      wrap.style.transition = "opacity 150ms ease";
 
       const img = document.createElement("img");
       img.className = "emoji-img";
@@ -120,6 +132,11 @@ function buildClass(): new (opts: ImageMarkerOptions) => ImageMarker {
       if (this.img) this.img.src = emojiUrl(emoji);
     }
 
+    setOpacity(o: number): void {
+      this.opacity = o;
+      if (this.wrap) this.wrap.style.opacity = String(o);
+    }
+
     // --- dragging (pointer-based; disables map panning while active) ---
     private containerPx(e: PointerEvent): { x: number; y: number } {
       const map = this.getMap() as google.maps.Map;
@@ -155,7 +172,10 @@ function buildClass(): new (opts: ImageMarkerOptions) => ImageMarker {
       const ll = proj.fromContainerPixelToLatLng(
         new google.maps.Point(p.x - this.grab.dx, p.y - this.grab.dy),
       );
-      if (ll) this.setPosition({ lat: ll.lat(), lng: ll.lng() });
+      if (ll) {
+        this.setPosition({ lat: ll.lat(), lng: ll.lng() });
+        this.onDrag?.(this.position);
+      }
     };
 
     private onPointerUp = (e: PointerEvent): void => {

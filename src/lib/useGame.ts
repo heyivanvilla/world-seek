@@ -182,6 +182,13 @@ export function useGame(code: string) {
     (spot: HidingSpot) => dispatch("solo:target", spot),
     [dispatch],
   );
+  // Stream an in-progress pin to watchers. Best-effort and high-frequency, so it
+  // skips the dispatch park/replay machinery — a preview lost to a blip is just a
+  // dropped frame, and the eventual guess:confirm is what actually matters.
+  const previewGuess = useCallback((at: LatLng) => {
+    const socket = getSocket();
+    if (socket.connected && seated.current) socket.emit("guess:preview", at);
+  }, []);
   const nextRound = useCallback(() => dispatch("round:next"), [dispatch]);
   const returnToLobby = useCallback(
     () => dispatch("game:returnToLobby"),
@@ -199,6 +206,7 @@ export function useGame(code: string) {
     hide,
     guess,
     sendSoloTarget,
+    previewGuess,
     nextRound,
     returnToLobby,
   };
