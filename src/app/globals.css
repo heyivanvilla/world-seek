@@ -748,3 +748,24 @@ input:focus {
   border-radius: 999px;
   background: var(--accent);
 }
+
+/* Connection-lost notice, pinned top-center above all phase UI. Subtle pulse so
+   it reads as "working on it" rather than a hard error. */
+.reconnect-banner {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  background: rgba(28, 16, 12, 0.92);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  backdrop-filter: blur(8px);
+  animation: roster-pulse 1.6s ease-in-out infinite;
+}

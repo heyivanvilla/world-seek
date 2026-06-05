@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  ActionAck,
   HidingSpot,
   JoinAck,
   JoinError,
@@ -10,7 +11,7 @@ import type {
   PublicState,
   ReconnectAck,
 } from "@/shared/types";
-import { emitAck, getSocket } from "./socket";
+import { emitAck, emitAction, getSocket } from "./socket";
 import { clearSession, loadSession, saveSession } from "./session";
 
 export type GameStatus = "connecting" | "need-join" | "in-game";
@@ -37,25 +38,50 @@ export function useGame(code: string) {
   const [connected, setConnected] = useState(false);
   const inGame = useRef(false);
 
+  // Whether the SERVER currently recognizes our live socket as our seat. Tracked
+  // apart from `connected` because a backgrounded tab can be dropped server-side
+  // (ping timeout) while the client still believes its socket is open.
+  const seated = useRef(false);
+  // Actions fired while we're not seated are parked here and replayed once the
+  // seat is re-established — otherwise they'd fire into a socket the server has
+  // already forgotten and silently vanish (the "stuck button" bug).
+  const pending = useRef<Array<() => void>>([]);
+  // Late-bound so the action dispatcher (stable across renders) can re-seat.
+  const reseatRef = useRef<() => Promise<boolean>>(async () => false);
+
+  const flushPending = useCallback(() => {
+    const queue = pending.current;
+    pending.current = [];
+    for (const run of queue) run();
+  }, []);
+
   useEffect(() => {
     const socket = getSocket();
 
-    const attemptReconnect = () => {
+    // (Re)claim our seat on the current connection. Resolves true once the
+    // server has acknowledged us, at which point any parked actions can replay.
+    const reseat = async (): Promise<boolean> => {
       const sess = loadSession(code);
       if (!sess) {
+        seated.current = false;
         if (!inGame.current) setStatus("need-join");
-        return;
+        return false;
       }
-      emitAck<ReconnectAck>("game:reconnect", {
+      const res = await emitAck<ReconnectAck>("game:reconnect", {
         code,
         sessionToken: sess.sessionToken,
-      }).then((res) => {
-        if (!res.ok) {
-          clearSession(code);
-          if (!inGame.current) setStatus("need-join");
-        }
       });
+      if (res.ok) {
+        seated.current = true;
+        flushPending();
+        return true;
+      }
+      seated.current = false;
+      clearSession(code);
+      if (!inGame.current) setStatus("need-join");
+      return false;
     };
+    reseatRef.current = reseat;
 
     const onState = (s: PublicState) => {
       inGame.current = true;
@@ -64,9 +90,12 @@ export function useGame(code: string) {
     };
     const onConnect = () => {
       setConnected(true);
-      attemptReconnect();
+      reseat();
     };
-    const onDisconnect = () => setConnected(false);
+    const onDisconnect = () => {
+      setConnected(false);
+      seated.current = false;
+    };
 
     socket.on("state", onState);
     socket.on("connect", onConnect);
@@ -74,7 +103,7 @@ export function useGame(code: string) {
 
     if (socket.connected) {
       setConnected(true);
-      attemptReconnect();
+      reseat();
     }
 
     return () => {
@@ -82,7 +111,32 @@ export function useGame(code: string) {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
     };
-  }, [code]);
+  }, [code, flushPending]);
+
+  // Send a game action, surviving a dropped or stale connection. If we aren't
+  // seated we park it and (re)connect first; if the server reports our seat
+  // lapsed mid-flight (`not_seated`) we re-establish it and replay once.
+  const dispatch = useCallback((event: string, payload?: unknown) => {
+    const socket = getSocket();
+
+    const send = () => {
+      emitAction<ActionAck>(event, payload).then((res) => {
+        if (!res.ok && res.reason === "not_seated") {
+          reseatRef.current().then((ok) => {
+            if (ok) emitAction<ActionAck>(event, payload);
+          });
+        }
+      });
+    };
+
+    if (socket.connected && seated.current) {
+      send();
+      return;
+    }
+    pending.current.push(send);
+    if (!socket.connected) socket.connect();
+    else reseatRef.current();
+  }, []);
 
   const join = useCallback(
     async (
@@ -95,13 +149,16 @@ export function useGame(code: string) {
           sessionToken: res.sessionToken,
           playerId: res.playerId,
         });
+        // The join itself seated this socket — let any parked actions go.
+        seated.current = true;
+        flushPending();
         setError(null);
         return { ok: true };
       }
       setError(joinErrorMessage(res.error));
       return { ok: false, takenEmojis: res.takenEmojis };
     },
-    [code],
+    [code, flushPending],
   );
 
   // Pre-join read so the join picker can grey out already-taken emojis.
@@ -110,19 +167,19 @@ export function useGame(code: string) {
     return res.ok ? res.takenEmojis : [];
   }, [code]);
 
-  const start = useCallback(() => getSocket().emit("game:start"), []);
+  const start = useCallback(() => dispatch("game:start"), [dispatch]);
   const hide = useCallback(
-    (spot: HidingSpot) => getSocket().emit("hide:confirm", spot),
-    [],
+    (spot: HidingSpot) => dispatch("hide:confirm", spot),
+    [dispatch],
   );
   const guess = useCallback(
-    (at: LatLng) => getSocket().emit("guess:confirm", at),
-    [],
+    (at: LatLng) => dispatch("guess:confirm", at),
+    [dispatch],
   );
-  const nextRound = useCallback(() => getSocket().emit("round:next"), []);
+  const nextRound = useCallback(() => dispatch("round:next"), [dispatch]);
   const returnToLobby = useCallback(
-    () => getSocket().emit("game:returnToLobby"),
-    [],
+    () => dispatch("game:returnToLobby"),
+    [dispatch],
   );
 
   return {

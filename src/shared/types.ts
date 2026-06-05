@@ -152,3 +152,10 @@ export type PeekAck =
 export type ReconnectAck =
   | { ok: true; playerId: string }
   | { ok: false; error: "not_found" | "bad_token" };
+
+// Acknowledgement for fire-and-forget game actions (start/hide/guess/next/lobby).
+// Lets the client tell a dropped or stale seat (`not_seated` — retriable after a
+// reconnect) apart from a genuine refusal (`rejected` — wrong phase / not host).
+export type ActionAck =
+  | { ok: true }
+  | { ok: false; reason: "not_seated" | "rejected" };
