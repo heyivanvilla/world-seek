@@ -35,10 +35,13 @@ body {
   font-family: var(--font-body);
 }
 
-#__next,
-body > div {
-  height: 100%;
-}
+/* NOTE: deliberately no blanket `body > div { height: 100% }` here. In the App
+   Router every top-level node — including fixed overlays like .reconnect-banner
+   and .game-menu — renders as a direct child of <body>, so that rule used to
+   stretch those overlays to the full viewport height (the "Reconnecting…" pill
+   filling the whole iPhone screen). Every actual screen (.center-screen,
+   .full-bleed, .modal-backdrop) is `position: fixed; inset: 0` and sizes itself,
+   so nothing needs a full-height body child. */
 
 a {
   color: var(--accent);
@@ -827,9 +830,13 @@ input:focus {
   z-index: 100;
   font-family: var(--font-mono);
   font-size: 12px;
-  /* Pin the line box to the text height — Cutive Mono's default `normal`
-     line-height carries a lot of vertical padding, which made the banner look
-     unexpectedly tall. nowrap keeps it a single compact line on narrow screens. */
+  /* Size strictly to the text. `height: auto` + `width: max-content` make the
+     pill immune to any ancestor sizing rule (it's a direct child of <body>),
+     so it can never be stretched to the full viewport again. `line-height: 1`
+     trims Cutive Mono's tall default line box; nowrap keeps it one line. */
+  height: auto;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   line-height: 1;
   white-space: nowrap;
   text-transform: uppercase;
