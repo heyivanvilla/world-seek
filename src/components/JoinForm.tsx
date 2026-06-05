@@ -59,6 +59,11 @@ export default function JoinForm({ code, error, onJoin, onPeek }: Props) {
           value={name}
           maxLength={24}
           onChange={(e) => setName(e.target.value)}
+          name="player-name"
+          autoComplete="off"
+          data-1p-ignore
+          data-lpignore="true"
+          data-bwignore
         />
         <span className="muted" style={{ fontSize: 13 }}>
           Pick your avatar
