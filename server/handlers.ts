@@ -12,6 +12,7 @@ import type {
 } from "../src/shared/types";
 import {
   bindSocket,
+  deleteRoom,
   getRoom,
   lookupSocket,
   saveRoom,
@@ -21,12 +22,14 @@ import {
   addPlayer,
   allConnectedHidden,
   allGuessed,
+  connectedPlayers,
   createRoom,
   findByToken,
   findPlayer,
   nextRound,
   recordGuess,
   recordHide,
+  removePlayer,
   returnToLobby,
   scoreRound,
   startFinding,
@@ -41,6 +44,17 @@ function broadcastState(io: Server, room: Room): void {
       io.to(p.socketId).emit("state", projectFor(room, p.id));
     }
   }
+}
+
+/** End a game for everyone: tell each live client to go home, then drop the room. */
+function closeRoom(io: Server, room: Room): void {
+  for (const p of room.players) {
+    if (p.connected && p.socketId) {
+      io.to(p.socketId).emit("game:closed");
+      unbindSocket(p.socketId);
+    }
+  }
+  deleteRoom(room.code);
 }
 
 /** Resolve which room/player a socket is currently seated at. */
@@ -188,6 +202,63 @@ export function registerHandlers(io: Server): void {
       if (!s) return reply(cb, { ok: false, reason: "not_seated" });
       if (!isGameMaster(s.room, s.playerId) || !returnToLobby(s.room))
         return reply(cb, { ok: false, reason: "rejected" });
+      broadcastState(io, s.room);
+      reply(cb, { ok: true });
+    });
+
+    // Host ends the game for everyone — all live clients get sent home.
+    socket.on("game:close", (cb?: AckFn) => {
+      const s = seat(socket);
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (!isGameMaster(s.room, s.playerId))
+        return reply(cb, { ok: false, reason: "rejected" });
+      closeRoom(io, s.room);
+      reply(cb, { ok: true });
+    });
+
+    // A player leaves; the rest keep playing (or the game ends if too few remain).
+    socket.on("game:leave", (cb?: AckFn) => {
+      const s = seat(socket);
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      // A leaving host = closing for everyone (defensive; the client routes here too).
+      if (isGameMaster(s.room, s.playerId)) {
+        closeRoom(io, s.room);
+        return reply(cb, { ok: true });
+      }
+
+      const { removed, wasCurrentTarget } = removePlayer(s.room, s.playerId);
+      if (!removed) return reply(cb, { ok: false, reason: "rejected" });
+      unbindSocket(socket.id);
+
+      // Room empty -> just drop it.
+      if (s.room.players.length === 0) {
+        deleteRoom(s.room.code);
+        return reply(cb, { ok: true });
+      }
+
+      const active = connectedPlayers(s.room).length;
+      const inProgress = s.room.phase !== "lobby" && s.room.phase !== "finished";
+
+      // A game in progress can't continue with one player -> end it for the rest.
+      if (inProgress && active < 2) {
+        closeRoom(io, s.room);
+        return reply(cb, { ok: true });
+      }
+
+      // Re-evaluate the phase transitions the leaver may have been blocking.
+      if (s.room.phase === "hiding") {
+        if (allConnectedHidden(s.room)) startFinding(s.room);
+      } else if (s.room.phase === "finding") {
+        if (wasCurrentTarget && s.room.currentRound >= s.room.order.length) {
+          s.room.phase = "finished";
+        } else if (allGuessed(s.room)) {
+          scoreRound(s.room);
+        }
+      } else if (s.room.phase === "results" && wasCurrentTarget) {
+        s.room.phase =
+          s.room.currentRound >= s.room.order.length ? "finished" : "finding";
+      }
+
       broadcastState(io, s.room);
       reply(cb, { ok: true });
     });

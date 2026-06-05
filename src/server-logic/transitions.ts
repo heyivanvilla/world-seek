@@ -92,6 +92,33 @@ export function connectedPlayers(room: Room): Player[] {
   return room.players.filter((p) => p.connected);
 }
 
+/** Fully remove a player. Returns whether they were the round's current target. */
+export function removePlayer(
+  room: Room,
+  playerId: string,
+): { removed: boolean; wasCurrentTarget: boolean } {
+  const idx = room.players.findIndex((p) => p.id === playerId);
+  if (idx === -1) return { removed: false, wasCurrentTarget: false };
+  const wasCurrentTarget = currentTargetId(room) === playerId;
+
+  room.players.splice(idx, 1);
+
+  // Drop any guesses the rest made against the leaver (their hiding spot is gone).
+  for (const p of room.players) {
+    delete p.guesses[playerId];
+  }
+
+  // Keep currentRound pointing at the same logical target after splicing `order`.
+  const orderIdx = room.order.indexOf(playerId);
+  if (orderIdx !== -1) {
+    room.order.splice(orderIdx, 1);
+    if (orderIdx < room.currentRound) room.currentRound -= 1;
+    // orderIdx === currentRound: currentRound now points at what was the next
+    // target (the caller's phase re-check handles advancing/finishing).
+  }
+  return { removed: true, wasCurrentTarget };
+}
+
 // --- lobby -> hiding -------------------------------------------------------
 
 export function startGame(room: Room): boolean {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useGame } from "@/lib/useGame";
+import ExitControl from "./ExitControl";
 import JoinForm from "./JoinForm";
 import Lobby from "./Lobby";
 import HidingPhase from "./HidingPhase";
@@ -54,6 +55,13 @@ export default function GameRoom({ code }: { code: string }) {
   return (
     <>
       {phase}
+      {/* Exit/leave control, present in every in-game phase. The host closes the
+          game for everyone; everyone else just leaves and the rest keep playing. */}
+      <ExitControl
+        isGameMaster={s.youAreGameMaster}
+        onLeave={game.leave}
+        onClose={game.close}
+      />
       {/* Surfaced when the socket drops (e.g. backgrounding the tab to send a
           text). Taps are queued and replayed on reconnect, so this tells the
           player to wait rather than hammering a button that looks dead. */}
