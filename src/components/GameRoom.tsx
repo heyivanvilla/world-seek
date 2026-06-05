@@ -32,18 +32,32 @@ export default function GameRoom({ code }: { code: string }) {
 
   const s = game.state;
 
-  switch (s.phase) {
-    case "lobby":
-      return <Lobby state={s} onStart={game.start} />;
-    case "hiding":
-      return <HidingPhase state={s} onHide={game.hide} />;
-    case "finding":
-      return (
-        <FindingPhase key={s.currentRound} state={s} onGuess={game.guess} />
-      );
-    case "results":
-      return <ResultsPhase key={s.currentRound} state={s} onNext={game.nextRound} />;
-    case "finished":
-      return <FinalScores state={s} onReturnToLobby={game.returnToLobby} />;
-  }
+  const phase = (() => {
+    switch (s.phase) {
+      case "lobby":
+        return <Lobby state={s} onStart={game.start} />;
+      case "hiding":
+        return <HidingPhase state={s} onHide={game.hide} />;
+      case "finding":
+        return (
+          <FindingPhase key={s.currentRound} state={s} onGuess={game.guess} />
+        );
+      case "results":
+        return (
+          <ResultsPhase key={s.currentRound} state={s} onNext={game.nextRound} />
+        );
+      case "finished":
+        return <FinalScores state={s} onReturnToLobby={game.returnToLobby} />;
+    }
+  })();
+
+  return (
+    <>
+      {phase}
+      {/* Surfaced when the socket drops (e.g. backgrounding the tab to send a
+          text). Taps are queued and replayed on reconnect, so this tells the
+          player to wait rather than hammering a button that looks dead. */}
+      {!game.connected && <div className="reconnect-banner">Reconnecting…</div>}
+    </>
+  );
 }

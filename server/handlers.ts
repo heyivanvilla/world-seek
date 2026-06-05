@@ -1,5 +1,6 @@
 import type { Server, Socket } from "socket.io";
 import type {
+  ActionAck,
   CreateAck,
   HidingSpot,
   JoinAck,
@@ -54,6 +55,13 @@ function seat(socket: Socket): { room: Room; playerId: string } | null {
 
 function isGameMaster(room: Room, playerId: string): boolean {
   return room.gameMasterId === playerId;
+}
+
+type AckFn = (res: ActionAck) => void;
+
+/** Invoke an action ack if the client supplied one (older clients may not). */
+function reply(cb: AckFn | undefined, res: ActionAck): void {
+  if (typeof cb === "function") cb(res);
 }
 
 export function registerHandlers(io: Server): void {
@@ -134,38 +142,54 @@ export function registerHandlers(io: Server): void {
       },
     );
 
-    socket.on("game:start", () => {
+    // Game actions reply with an ack. A missing seat is reported as `not_seated`
+    // (the socket was dropped server-side, e.g. a backgrounded tab) so the client
+    // can re-establish its session and replay — rather than the tap vanishing.
+    socket.on("game:start", (cb?: AckFn) => {
       const s = seat(socket);
-      if (!s || !isGameMaster(s.room, s.playerId)) return;
-      if (startGame(s.room)) broadcastState(io, s.room);
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (!isGameMaster(s.room, s.playerId) || !startGame(s.room))
+        return reply(cb, { ok: false, reason: "rejected" });
+      broadcastState(io, s.room);
+      reply(cb, { ok: true });
     });
 
-    socket.on("hide:confirm", (spot: HidingSpot) => {
+    socket.on("hide:confirm", (spot: HidingSpot, cb?: AckFn) => {
       const s = seat(socket);
-      if (!s) return;
-      if (!recordHide(s.room, s.playerId, spot)) return;
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (!recordHide(s.room, s.playerId, spot))
+        return reply(cb, { ok: false, reason: "rejected" });
       if (allConnectedHidden(s.room)) startFinding(s.room);
       broadcastState(io, s.room);
+      reply(cb, { ok: true });
     });
 
-    socket.on("guess:confirm", (at: LatLng) => {
+    socket.on("guess:confirm", (at: LatLng, cb?: AckFn) => {
       const s = seat(socket);
-      if (!s) return;
-      if (!recordGuess(s.room, s.playerId, at)) return;
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (!recordGuess(s.room, s.playerId, at))
+        return reply(cb, { ok: false, reason: "rejected" });
       if (allGuessed(s.room)) scoreRound(s.room);
       broadcastState(io, s.room);
+      reply(cb, { ok: true });
     });
 
-    socket.on("round:next", () => {
+    socket.on("round:next", (cb?: AckFn) => {
       const s = seat(socket);
-      if (!s || !isGameMaster(s.room, s.playerId)) return;
-      if (nextRound(s.room)) broadcastState(io, s.room);
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (!isGameMaster(s.room, s.playerId) || !nextRound(s.room))
+        return reply(cb, { ok: false, reason: "rejected" });
+      broadcastState(io, s.room);
+      reply(cb, { ok: true });
     });
 
-    socket.on("game:returnToLobby", () => {
+    socket.on("game:returnToLobby", (cb?: AckFn) => {
       const s = seat(socket);
-      if (!s || !isGameMaster(s.room, s.playerId)) return;
-      if (returnToLobby(s.room)) broadcastState(io, s.room);
+      if (!s) return reply(cb, { ok: false, reason: "not_seated" });
+      if (!isGameMaster(s.room, s.playerId) || !returnToLobby(s.room))
+        return reply(cb, { ok: false, reason: "rejected" });
+      broadcastState(io, s.room);
+      reply(cb, { ok: true });
     });
 
     socket.on("disconnect", () => {
