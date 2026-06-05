@@ -376,7 +376,9 @@ input:focus {
 }
 
 /* Exit/leave button — pinned bottom-left, clear of the top overlays (.overlay-top,
-   .roster) and the bottom-center .overlay-bar. Sits above them so it's always tappable. */
+   .roster) and the bottom-center .overlay-bar. Sits above them so it's always
+   tappable. On phones the .overlay-bar docks full-width, so it lifts above this
+   button instead (see the 560px block) and the two stack rather than collide. */
 .exit-control {
   position: fixed;
   bottom: 16px;
@@ -634,15 +636,27 @@ input:focus {
    a small screen. Tablets keep the roomy centered bar. */
 @media (max-width: 560px) {
   /* The centered floating bar becomes a slim full-width docked bar with side
-     gutters, so the fixed 280px message slot can't push it past the viewport. */
+     gutters, so the fixed 280px message slot can't push it past the viewport.
+     Lifted clear of the bottom-left .exit-control (which stays pinned to the
+     very bottom) so the two stack instead of overlapping — see .exit-control
+     below. Raising the bar rather than the button keeps them apart even when
+     the message wraps to multiple lines. */
   .overlay-bar {
     left: 12px;
     right: 12px;
-    bottom: 12px;
+    bottom: 64px;
     transform: none;
     max-width: none;
     gap: 10px;
     padding: 10px 12px;
+  }
+
+  /* Tuck the exit button into the bottom-left gutter, beneath the docked
+     .overlay-bar. On phones the bar spans the full width, so there's no room
+     to sit beside it — the bar lifts above to clear this button. */
+  .exit-control {
+    bottom: 12px;
+    left: 12px;
   }
 
   /* Desktop reveal bakes translate(-50%) into its keyframes — on phones the bar
