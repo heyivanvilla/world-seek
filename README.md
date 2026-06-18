@@ -4,6 +4,9 @@
 somewhere in the world (their hiding spot), then everyone takes turns guessing where each
 player is hiding using Google Street View. 🏆 Points are awarded by distance — closest wins!
 
+▶️ **[Watch here for game walkthough](https://youtu.be/eQZJzsQGTDQ)**
+
+
 ## 🧰 Stack
 
 - ⚡ **Next.js 14** (App Router) for the client
