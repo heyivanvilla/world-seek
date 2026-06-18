@@ -4,6 +4,10 @@
 // server (validation, default fallback) — add a line here for every file dropped
 // into public/emojis/. Keep at least MAX_PLAYERS (12) entries so a full room can
 // never run out of distinct avatars (emojis are unique per room).
+//
+// Assets are from OpenMoji (https://openmoji.org), licensed CC-BY-SA 4.0 — see the
+// "License" section of the README. Swapping them is just a matter of dropping new
+// files into public/emojis/ and editing the list below.
 
 export interface EmojiDef {
   /** Stable id stored on the player + sent over the wire (never the raw filename). */
@@ -13,34 +17,26 @@ export interface EmojiDef {
 }
 
 export const EMOJIS: EmojiDef[] = [
-  { id: "02-dance", file: "02_dance.gif" },
-  { id: "0cat", file: "0cat.gif" },
-  { id: "17j9j", file: "17j9j.gif" },
-  { id: "1-wtf-rickq", file: "1_wtf_rickq.gif" },
-  { id: "200-character-meme-spoof", file: "200_character_meme_spoof.png" },
-  { id: "60fps-parrot", file: "60fps_parrot.gif" },
-  { id: "aaahhhh", file: "aaahhhh.gif" },
-  { id: "aaw-yeah", file: "aaw_yeah.gif" },
-  { id: "ac-cowgirlq", file: "ac_cowgirlq.png" },
-  { id: "acarl-runq", file: "acarl_runq.gif" },
-  { id: "aceventura-dance", file: "aceventura_dance.gif" },
-  { id: "ado-happy", file: "ado_happy.webp" },
-  { id: "aggretsuko-rage", file: "aggretsuko-rage.gif" },
-  { id: "charmander-dancing", file: "charmander_dancing.gif" },
-  { id: "doge-finger-guns-back", file: "doge_finger_guns_back.png" },
-  { id: "dumpster-fire", file: "dumpster-fire.gif" },
-  { id: "gif4q", file: "gif4q.gif" },
-  { id: "gif-bunny-sadq", file: "gif_bunny_sadq.gif" },
-  { id: "hyper", file: "hyper.gif" },
-  { id: "luigi-dance", file: "luigi_dance.gif" },
-  { id: "mario", file: "mario.gif" },
-  { id: "narutorun", file: "narutorun.gif" },
-  { id: "smart", file: "smart.gif" },
-  { id: "snorlax", file: "snorlax.png" },
-  { id: "snorlaxrun", file: "snorlaxrun.gif" },
-  { id: "squirtle-jammin", file: "squirtle_jammin.gif" },
-  { id: "surprised-pikachu", file: "surprised-pikachu.png" },
-  { id: "thisisfine", file: "thisisfine.gif" },
+  { id: "grinning", file: "grinning.svg" },
+  { id: "cool", file: "cool.svg" },
+  { id: "nerd", file: "nerd.svg" },
+  { id: "clown", file: "clown.svg" },
+  { id: "mind-blown", file: "mind-blown.svg" },
+  { id: "ghost", file: "ghost.svg" },
+  { id: "robot", file: "robot.svg" },
+  { id: "alien", file: "alien.svg" },
+  { id: "dog", file: "dog.svg" },
+  { id: "cat", file: "cat.svg" },
+  { id: "fox", file: "fox.svg" },
+  { id: "lion", file: "lion.svg" },
+  { id: "frog", file: "frog.svg" },
+  { id: "panda", file: "panda.svg" },
+  { id: "penguin", file: "penguin.svg" },
+  { id: "unicorn", file: "unicorn.svg" },
+  { id: "dragon", file: "dragon.svg" },
+  { id: "rocket", file: "rocket.svg" },
+  { id: "fire", file: "fire.svg" },
+  { id: "mushroom", file: "mushroom.svg" },
 ];
 
 const BY_ID = new Map(EMOJIS.map((e) => [e.id, e]));

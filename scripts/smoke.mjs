@@ -48,8 +48,8 @@ check("create returns code", !!created.code);
 const code = created.code;
 
 // Distinct emojis: avatars are unique per room, so each player picks their own.
-const jb = await emitAck(b, "game:join", { code, name: "Bob", emoji: "0cat" });
-const jc = await emitAck(c, "game:join", { code, name: "Cara", emoji: "17j9j" });
+const jb = await emitAck(b, "game:join", { code, name: "Bob", emoji: "cat" });
+const jc = await emitAck(c, "game:join", { code, name: "Cara", emoji: "fox" });
 check("Bob joined", jb.ok === true);
 check("Cara joined", jc.ok === true);
 

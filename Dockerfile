@@ -9,8 +9,9 @@ FROM base AS build
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev
 COPY . .
-# NEXT_PUBLIC_* is inlined into the client bundle at build time -> must be a build arg.
-# Coolify passes a build-time env var of the same name through as --build-arg.
+# NEXT_PUBLIC_* is inlined into the client bundle at build time -> must be a build arg,
+# NOT a runtime-only env var. Pass it with `docker build --build-arg NEXT_PUBLIC_...=...`
+# (most PaaS platforms expose this as a "build-time" / "build" variable).
 ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 RUN npm run build

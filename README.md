@@ -1,24 +1,26 @@
 # 🌍 World Seek
 
-A multiplayer hide-and-seek geo-guessing party game. Each player secretly drops a pin
+🎉 A multiplayer hide-and-seek geo-guessing party game! 🕵️ Each player secretly drops a pin 📍
 somewhere in the world (their hiding spot), then everyone takes turns guessing where each
-player is hiding using Google Street View. Points are awarded by distance — closest wins.
+player is hiding using Google Street View. 🏆 Points are awarded by distance — closest wins!
 
-## Stack
+## 🧰 Stack
 
-- **Next.js 14** (App Router) for the client
-- **Socket.IO** on a **custom Node server** that holds all room state in memory and is the
+- ⚡ **Next.js 14** (App Router) for the client
+- 🔌 **Socket.IO** on a **custom Node server** that holds all room state in memory and is the
   single source of truth (clients send intents; the server runs the game and pushes a
   redacted per-player state)
-- **Google Maps + Street View** for hiding and guessing
+- 🗺️ **Google Maps + Street View** for hiding and guessing
 
-## Prerequisites
+## ✅ Prerequisites
 
-- Node.js 18+ (this repo was verified on Node 24)
-- A **Google Maps JavaScript API key** with **Maps JavaScript API** and **Street View**
+- 🟢 Node.js 18+ (this repo was verified on Node 24)
+- 🔑 A **Google Maps JavaScript API key** with **Maps JavaScript API** and **Street View**
   enabled and **billing on** (in the [Google Cloud console](https://console.cloud.google.com/)).
 
-## Setup
+## ⚙️ Setup
+
+**1. Install dependencies and create your env file**
 
 ```bash
 npm install
@@ -26,7 +28,32 @@ cp .env.example .env.local
 # edit .env.local and set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-key
 ```
 
-## Run (development)
+**2. 🚨 RESTRICT YOUR GOOGLE MAPS API KEY — do not skip this**
+
+> ### ⚠️ This is a public, browser-side key. Treat it accordingly.
+>
+> The Maps JavaScript API key is prefixed `NEXT_PUBLIC_` because it **ships to every
+> visitor's browser** — there is no way to hide it, and that's by design for the Maps JS
+> API. Anyone can open DevTools and read it. **An unrestricted key is a blank cheque
+> against your credit card:** scrapers harvest exposed Maps keys and run up thousands of
+> dollars in billing on *your* account.
+>
+> **Before you deploy anywhere public, you MUST lock the key down in the
+> [Google Cloud console](https://console.cloud.google.com/google/maps-apis/credentials):**
+>
+> 1. **Application restriction → HTTP referrers (web sites).** Add *only* the domains that
+>    are allowed to use the key, e.g.:
+>    - `https://worldseek.yourdomain.com/*`
+>    - `http://localhost:3000/*` (for local dev)
+> 2. **API restriction → Restrict key** and enable *only* **Maps JavaScript API**.
+> 3. **Set a billing budget + alert** (Billing → Budgets & alerts) so a leak can't run
+>    unbounded — e.g. alert at $10/$50.
+>
+> ✅ With HTTP-referrer restriction in place, a stolen key is useless on any other domain.
+> ❌ Without it, assume the key **will** be abused. Never commit a real key — `.env*` is
+> gitignored (only `.env.example`, a placeholder, is tracked).
+
+## 🏃 Run (development)
 
 ```bash
 npm run dev
@@ -36,57 +63,107 @@ npm run dev
 The `dev` script runs the **custom server** (`server/index.ts`) via `tsx watch`, which serves
 both Next.js and the Socket.IO endpoint on the same port.
 
-## Production
+## 🚀 Production (plain Node)
 
 ```bash
 npm run build
 npm start
 ```
 
-## Deploy on Coolify (self-hosted)
+## 🐳 Deploy with Docker
 
-The repo ships a `Dockerfile` and `.dockerignore`, so deploying is "point Coolify at the repo".
+The repo ships a standard multi-stage `Dockerfile` and `.dockerignore` — no platform-specific
+config. It runs on anything that builds a Dockerfile: a bare VPS, `docker compose`, Kubernetes,
+or a PaaS (Coolify, Render, Railway, Fly, Cloud Run, …).
 
-1. **DNS:** point an `A` record (e.g. `worldseek.yourdomain.com`) at your Coolify server IP.
-2. **Connect the repo:** Coolify → *Sources* → add a **GitHub App** (enables auto-deploy on
-   push) with access to this private repo.
-3. **New Resource → Application** → pick the repo + branch. **Build Pack: Dockerfile.**
-4. **Port:** set *Ports Exposes* to `3000`. **Domain:** set the FQDN (Coolify issues HTTPS via
-   Traefik, including `wss://` for the socket).
-5. **Environment variables:**
-   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — **mark as a Build Variable** (available at build time).
-     Next.js inlines it into the browser bundle during `next build`; if it's runtime-only,
-     Street View silently fails.
-   - `ALLOWED_ORIGIN` = your `https://...` domain (runtime; locks Socket.IO CORS).
-   - `PORT` = `3000` (optional).
-6. **Deploy.** Keep **replicas = 1** — game state is in-memory, so a second instance would split
-   rooms and break Socket.IO.
+> ### ⚠️ The one thing you can't get wrong: the Maps key is a **build arg**
+>
+> `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is inlined into the **browser bundle** during `next build`,
+> so it must be passed at **build time** (`--build-arg`), not just as a runtime env var. Pass it
+> only at runtime and **Street View silently fails** with no obvious error. The other variables
+> (`ALLOWED_ORIGIN`, `PORT`) are runtime-only.
 
-**Secure the Maps key** in Google Cloud Console (it's public by design): add an HTTP-referrer
-restriction for your domain, restrict it to the **Maps JavaScript API**, and set a billing
-budget alert.
+### Build & run directly
 
-## How to play
+```bash
+# Build — the Maps key MUST be a --build-arg (baked into the client bundle)
+docker build \
+  --build-arg NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-key \
+  -t world-seek .
 
-1. Open `http://localhost:3000`, enter a name, and **Start game**. You're the host (GM).
-2. Share the URL (e.g. `http://localhost:3000/game/abr-tyr`). Each person opens it and picks
+# Run — ALLOWED_ORIGIN and PORT are runtime env vars
+docker run -p 3000:3000 \
+  -e ALLOWED_ORIGIN=https://worldseek.yourdomain.com \
+  world-seek
+```
+
+### Or with `docker compose`
+
+```yaml
+# compose.yaml
+services:
+  world-seek:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+    ports:
+      - "3000:3000"
+    environment:
+      ALLOWED_ORIGIN: https://worldseek.yourdomain.com
+    restart: unless-stopped
+```
+
+```bash
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-key docker compose up --build
+```
+
+### Environment variables
+
+| Variable | When | Required | Purpose |
+|---|---|---|---|
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | **build** | ✅ | Maps + Street View; inlined into the client bundle |
+| `ALLOWED_ORIGIN` | runtime | prod | Your `https://…` origin; locks Socket.IO CORS |
+| `PORT` | runtime | — | Listen port (defaults to `3000`) |
+
+> ### 🚦 Run exactly one instance
+> Game state is held **in memory**, so World Seek does **not** scale horizontally. Keep
+> **replicas = 1** (no autoscaling / load-balanced multi-instance) — a second instance would
+> split rooms and break Socket.IO reconnections. Put a reverse proxy (Caddy, Traefik, nginx) in
+> front for HTTPS; make sure it forwards WebSocket upgrades so `wss://` works.
+
+### On a PaaS (Coolify, Render, Railway, …)
+
+Point it at the repo, set **Build Pack / builder = Dockerfile**, expose port **3000**, and set
+the variables above — crucially, mark `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` as a **build-time / build
+variable** (not runtime-only). Most platforms terminate HTTPS and handle WebSocket upgrades for
+you. Keep it to a single instance.
+
+> 🔐 **Don't forget to restrict the Maps key** in the Google Cloud console before exposing it —
+> HTTP-referrer restriction for your domain, scope it to the Maps JavaScript API, and set a
+> billing budget alert. See [Setup → step 2](#️-setup).
+
+## 🎮 How to play
+
+1. 🏠 Open `http://localhost:3000`, enter a name, and **Start game**. You're the host (GM).
+2. 🔗 Share the URL (e.g. `http://localhost:3000/game/abr-tyr`). Each person opens it and picks
    a name; they appear in your lobby live.
-3. As host, pick a difficulty and **Start game** (needs ≥2 players).
-4. **Hiding:** everyone drops a pin and confirms with **Hide here** (only spots with Street
+3. 🎚️ As host, pick a difficulty and **Start game** (needs ≥2 players).
+4. 🙈 **Hiding:** everyone drops a pin and confirms with **Hide here** (only spots with Street
    View coverage are allowed).
-5. **Finding:** one hider at a time — everyone else sees that hider's Street View and drops a
+5. 🔍 **Finding:** one hider at a time — everyone else sees that hider's Street View and drops a
    guess. The hider sits out their own round.
-6. **Results:** the real spot, all guesses, and points are revealed. Host advances.
-7. After the last round, final scores + winner. Host can return everyone to the lobby.
+6. 🎊 **Results:** the real spot, all guesses, and points are revealed. Host advances.
+7. 🥇 After the last round, final scores + winner. Host can return everyone to the lobby.
 
-### Reconnection & join-locking
+### 🔄 Reconnection & join-locking
 
 - A session token is stored in `localStorage` per game. Refresh or reconnect mid-game and you
   drop back into your seat.
 - New players **cannot join once the game has started** — only reconnections with a valid
   token are honored.
 
-## Project layout
+## 🗂️ Project layout
 
 ```
 server/                 custom Node server (Next + Socket.IO) and event handlers
@@ -98,7 +175,7 @@ src/app/                home page + /game/[code] room shell
 scripts/smoke.mjs       headless end-to-end test of the full game loop (server must be running)
 ```
 
-## Testing the game logic without a browser
+## 🧪 Testing the game logic without a browser
 
 With the dev server running:
 
@@ -109,10 +186,31 @@ node scripts/smoke.mjs
 This drives three simulated players through create → join → start → hide → guess → results →
 finish → reconnect, asserting the server's behavior (no Maps key needed).
 
-## Known limitations (MVP)
+## ⚠️ Known limitations (MVP)
 
-- Room state is in-memory — a server restart drops live games.
-- Anti-cheat is panoId-based (the hider's coords aren't sent to guessers until the reveal),
+- 💾 Room state is in-memory — a server restart drops live games.
+- 🛡️ Anti-cheat is panoId-based (the hider's coords aren't sent to guessers until the reveal),
   which is friendly-game grade, not bulletproof.
-- No per-phase timers — phases advance when everyone has acted, with a host "skip the wait"
+- ⏱️ No per-phase timers — phases advance when everyone has acted, with a host "skip the wait"
   override.
+
+## 📜 License
+
+The **code** is released under the [MIT License](LICENSE) — free to use, modify, and distribute.
+
+**Bundled assets (not MIT):**
+
+- 🙂 The emoji avatars in [`public/emojis/`](public/emojis/) are from
+  [**OpenMoji**](https://openmoji.org) and are licensed
+  [**CC-BY-SA 4.0**](https://creativecommons.org/licenses/by-sa/4.0/). If you redistribute
+  them you must keep this attribution and share any modifications under the same license.
+  Swap them out (see [`src/shared/emojis.ts`](src/shared/emojis.ts)) if you'd rather not
+  carry the share-alike terms.
+
+> ℹ️ The MIT license covers this project's own code, not the third-party assets above and
+> not the **Google Maps + Street View** platform, which World Seek relies on at runtime.
+> Google Maps is a proprietary service governed by the
+> [Google Maps Platform Terms of Service](https://cloud.google.com/maps-platform/terms);
+> anyone running World Seek must supply their own (restricted — see
+> [Setup](#️-setup)) API key and accept Google's terms. The MIT license grants no rights
+> to that service.
