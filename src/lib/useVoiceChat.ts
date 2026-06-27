@@ -6,7 +6,19 @@ import { getSocket } from "./socket";
 
 export type VoiceMode = "always-on" | "push-to-talk" | "mute";
 
-const STUN_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+function buildIceServers(): RTCIceServer[] {
+  const servers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
+  // Optional TURN relay — required for symmetric NAT (common in mobile/corporate
+  // networks). Set these env vars to enable: NEXT_PUBLIC_TURN_URL,
+  // NEXT_PUBLIC_TURN_USERNAME, NEXT_PUBLIC_TURN_CREDENTIAL
+  const url = process.env.NEXT_PUBLIC_TURN_URL;
+  const username = process.env.NEXT_PUBLIC_TURN_USERNAME;
+  const credential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
+  if (url && username && credential) {
+    servers.push({ urls: url, username, credential });
+  }
+  return servers;
+}
 const LS_VOICE_MODE = "ws-voice-mode";
 const LS_MIC_DEVICE = "ws-mic-device";
 const SPEAK_THRESHOLD = 0.01;
@@ -62,6 +74,9 @@ export function useVoiceChat(
 
   const peersRef = useRef(new Map<string, RTCPeerConnection>());
   const remoteAnalysersRef = useRef(new Map<string, AnalyserNode>());
+  // Persistent references to Audio elements — must be kept alive so the GC
+  // doesn't collect them and silently stop playback.
+  const audioElemsRef = useRef(new Map<string, HTMLAudioElement>());
   const localAnalyserRef = useRef<AnalyserNode | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -95,7 +110,7 @@ export function useVoiceChat(
     const existing = peersRef.current.get(peerId);
     if (existing) return existing;
 
-    const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     peersRef.current.set(peerId, pc);
 
     const localStream = localStreamRef.current;
@@ -121,17 +136,22 @@ export function useVoiceChat(
       analyser.fftSize = 512;
       src.connect(analyser);
       remoteAnalysersRef.current.set(peerId, analyser);
-      // Play remote audio through the page
+      // Store the Audio element in a ref — a local variable would be GC'd,
+      // silently killing playback.
       const audio = new Audio();
       audio.srcObject = stream;
+      audioElemsRef.current.set(peerId, audio);
       audio.play().catch((err) => console.warn("[voice] autoplay blocked for peer", peerId, err));
     };
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
+      console.log(`[voice] peer ${peerId} → ${state}`);
       if (state === "failed" || state === "closed") {
         peersRef.current.delete(peerId);
         remoteAnalysersRef.current.delete(peerId);
+        const audio = audioElemsRef.current.get(peerId);
+        if (audio) { audio.srcObject = null; audioElemsRef.current.delete(peerId); }
       }
     };
 
@@ -313,6 +333,8 @@ export function useVoiceChat(
       for (const [, pc] of peersRef.current) pc.close();
       peersRef.current.clear();
       remoteAnalysersRef.current.clear();
+      audioElemsRef.current.forEach((a) => { a.srcObject = null; });
+      audioElemsRef.current.clear();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       localAnalyserRef.current = null;
