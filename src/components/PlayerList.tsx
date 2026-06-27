@@ -8,6 +8,7 @@ interface Props {
   showScore?: boolean;
   showHidden?: boolean;
   hiddenLabel?: string;
+  speakingIds?: Set<string>;
 }
 
 export default function PlayerList({
@@ -15,6 +16,7 @@ export default function PlayerList({
   showScore,
   showHidden,
   hiddenLabel = "ready",
+  speakingIds,
 }: Props) {
   return (
     <div
@@ -24,7 +26,10 @@ export default function PlayerList({
       {players.map((p) => (
         <div key={p.id} className="player-row">
           <div className="row" style={{ gap: 8 }}>
-            <span className="roster-avatar" aria-hidden="true">
+            <span
+              className={`roster-avatar${speakingIds?.has(p.id) ? " is-speaking" : ""}`}
+              aria-hidden="true"
+            >
               <img className="emoji-img" src={emojiUrl(p.emoji)} alt="" />
             </span>
             <strong>{p.name}</strong>

@@ -11,6 +11,7 @@ import WaitingBar from "./WaitingBar";
 interface Props {
   state: PublicState;
   onHide: (spot: HidingSpot) => void;
+  speakingIds?: Set<string>;
 }
 
 type Coverage = "unknown" | "checking" | "ok" | "none";
@@ -24,7 +25,7 @@ function snapRadius(lat: number, zoom: number): number {
   return Math.min(200000, Math.max(40, Math.round(metersPerPixel * 40)));
 }
 
-export default function HidingPhase({ state, onHide }: Props) {
+export default function HidingPhase({ state, onHide, speakingIds }: Props) {
   // `query` is the clicked point we resolve from (only changes on a click, so
   // Street View resolves exactly once per pick). `resolved` is the snapped
   // panorama. Keeping them separate avoids feeding the snap back into the
@@ -55,6 +56,7 @@ export default function HidingPhase({ state, onHide }: Props) {
               players={state.players}
               showHidden
               hiddenLabel="hidden"
+              speakingIds={speakingIds}
             />
           </div>
         </div>

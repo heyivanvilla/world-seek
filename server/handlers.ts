@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import type { Server, Socket } from "socket.io";
 import type {
   ActionAck,
+  ChatMessage,
   CreateAck,
   HidingSpot,
   JoinAck,
@@ -11,8 +13,10 @@ import type {
   Settings,
 } from "../src/shared/types";
 import {
+  addChatMessage,
   bindSocket,
   deleteRoom,
+  getChatHistory,
   getRoom,
   lookupSocket,
   saveRoom,
@@ -140,6 +144,9 @@ export function registerHandlers(io: Server): void {
           playerId: result.player.id,
         });
         broadcastState(io, room);
+        if (room.settings.textChat) {
+          socket.emit("chat:history", getChatHistory(room.code));
+        }
       },
     );
 
@@ -158,6 +165,9 @@ export function registerHandlers(io: Server): void {
         bindSocket(socket.id, room.code, player.id);
         ack({ ok: true, playerId: player.id });
         broadcastState(io, room);
+        if (room.settings.textChat) {
+          socket.emit("chat:history", getChatHistory(room.code));
+        }
       },
     );
 
@@ -296,6 +306,61 @@ export function registerHandlers(io: Server): void {
 
       broadcastState(io, s.room);
       reply(cb, { ok: true });
+    });
+
+    // ---------------------------------------------------------------------------
+    // Text chat
+    // ---------------------------------------------------------------------------
+
+    socket.on("chat:send", (payload: { text: string }) => {
+      const s = seat(socket);
+      if (!s || !s.room.settings.textChat) return;
+      const text = (payload?.text ?? "").trim().slice(0, 500);
+      if (!text) return;
+      const player = findPlayer(s.room, s.playerId);
+      if (!player) return;
+      const msg: ChatMessage = {
+        id: randomUUID(),
+        playerId: s.playerId,
+        playerName: player.name,
+        emoji: player.emoji,
+        text,
+        ts: Date.now(),
+      };
+      addChatMessage(s.room.code, msg);
+      for (const p of s.room.players) {
+        if (p.connected && p.socketId) {
+          io.to(p.socketId).emit("chat:message", msg);
+        }
+      }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Voice chat signaling (server relays only — never handles audio data)
+    // ---------------------------------------------------------------------------
+
+    socket.on("voice:offer", (payload: { to: string; sdp: RTCSessionDescriptionInit }) => {
+      const s = seat(socket);
+      if (!s || !s.room.settings.voiceChat) return;
+      const target = findPlayer(s.room, payload?.to ?? "");
+      if (!target?.socketId || !target.connected) return;
+      io.to(target.socketId).emit("voice:offer", { from: s.playerId, sdp: payload.sdp });
+    });
+
+    socket.on("voice:answer", (payload: { to: string; sdp: RTCSessionDescriptionInit }) => {
+      const s = seat(socket);
+      if (!s || !s.room.settings.voiceChat) return;
+      const target = findPlayer(s.room, payload?.to ?? "");
+      if (!target?.socketId || !target.connected) return;
+      io.to(target.socketId).emit("voice:answer", { from: s.playerId, sdp: payload.sdp });
+    });
+
+    socket.on("voice:ice", (payload: { to: string; candidate: RTCIceCandidateInit }) => {
+      const s = seat(socket);
+      if (!s || !s.room.settings.voiceChat) return;
+      const target = findPlayer(s.room, payload?.to ?? "");
+      if (!target?.socketId || !target.connected) return;
+      io.to(target.socketId).emit("voice:ice", { from: s.playerId, candidate: payload.candidate });
     });
 
     socket.on("disconnect", () => {

@@ -9,13 +9,32 @@ export interface Settings {
   scoreScaleKm: number;
   /** Number of rounds in a solo game (the game picks one location per round). */
   soloRounds: number;
+  /** Whether in-game text chat is enabled. */
+  textChat: boolean;
+  /** Whether in-game voice chat (WebRTC) is enabled. */
+  voiceChat: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   maxPoints: 5000,
   scoreScaleKm: 2000,
   soloRounds: 5,
+  textChat: true,
+  voiceChat: false,
 };
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  emoji: string;
+  text: string;
+  ts: number;
+}
 
 /**
  * "multiplayer" = the classic hide & seek (players hide, others guess).

@@ -7,9 +7,10 @@ import PlayerList from "./PlayerList";
 interface Props {
   state: PublicState;
   onStart: () => void;
+  speakingIds?: Set<string>;
 }
 
-export default function Lobby({ state, onStart }: Props) {
+export default function Lobby({ state, onStart, speakingIds }: Props) {
   const [copied, setCopied] = useState(false);
   const isGM = state.youAreGameMaster;
   // Alone in the room? Starting runs a solo game (the server decides the mode by
@@ -45,7 +46,7 @@ export default function Lobby({ state, onStart }: Props) {
             <span className="eyebrow">Players ({state.players.length})</span>
             <span className="muted">1 solo · 2–12 multiplayer</span>
           </div>
-          <PlayerList players={state.players} />
+          <PlayerList players={state.players} speakingIds={speakingIds} />
         </div>
 
         {isGM ? (

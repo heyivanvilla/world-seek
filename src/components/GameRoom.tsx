@@ -1,6 +1,8 @@
 "use client";
 
 import { useGame } from "@/lib/useGame";
+import { useTextChat } from "@/lib/useTextChat";
+import { useVoiceChat } from "@/lib/useVoiceChat";
 import GameMenu from "./GameMenu";
 import JoinForm from "./JoinForm";
 import Lobby from "./Lobby";
@@ -9,9 +11,21 @@ import FindingPhase from "./FindingPhase";
 import SoloLoading from "./SoloLoading";
 import ResultsPhase from "./ResultsPhase";
 import FinalScores from "./FinalScores";
+import TextChat from "./TextChat";
+import VoiceChat from "./VoiceChat";
 
 export default function GameRoom({ code }: { code: string }) {
   const game = useGame(code);
+
+  const textChatEnabled = game.state?.settings.textChat ?? false;
+  const voiceChatEnabled = game.state?.settings.voiceChat ?? false;
+
+  const textChat = useTextChat(textChatEnabled);
+  const voice = useVoiceChat(
+    voiceChatEnabled,
+    game.state?.players ?? [],
+    game.state?.youId ?? "",
+  );
 
   if (game.status === "connecting") {
     return (
@@ -37,22 +51,15 @@ export default function GameRoom({ code }: { code: string }) {
   const phase = (() => {
     switch (s.phase) {
       case "lobby":
-        return <Lobby state={s} onStart={game.start} />;
+        return <Lobby state={s} onStart={game.start} speakingIds={voice.speakingIds} />;
       case "hiding":
-        return <HidingPhase state={s} onHide={game.hide} />;
+        return <HidingPhase state={s} onHide={game.hide} speakingIds={voice.speakingIds} />;
       case "finding":
-        // Solo rounds open with no location until the browser generates one.
         if (s.solo && !s.currentTarget) {
           return (
             <SoloLoading key={s.currentRound} onTarget={game.sendSoloTarget} />
           );
         }
-        // No key on currentRound here on purpose: keying would remount the
-        // phase every round, tearing down and re-instantiating the underlying
-        // google.maps.Map / StreetViewPanorama — each a billable Maps load. By
-        // persisting the component, the same map/pano instances are reused and
-        // just updated (setPano, recenter, new markers) as the round changes.
-        // The phases reset their own per-round view state internally instead.
         return (
           <FindingPhase
             state={s}
@@ -70,18 +77,27 @@ export default function GameRoom({ code }: { code: string }) {
   return (
     <>
       {phase}
-      {/* Top-right menu, present in every in-game phase. Houses the exit/leave
-          action: the host closes the game for everyone; everyone else just
-          leaves and the rest keep playing. */}
       <GameMenu
         isGameMaster={s.youAreGameMaster}
         onLeave={game.leave}
         onClose={game.close}
       />
-      {/* Surfaced when the socket drops (e.g. backgrounding the tab to send a
-          text). Taps are queued and replayed on reconnect, so this tells the
-          player to wait rather than hammering a button that looks dead. */}
       {!game.connected && <div className="reconnect-banner">Reconnecting…</div>}
+
+      {/* Voice strip — sits above the chat button */}
+      {voiceChatEnabled && (
+        <VoiceChat {...voice} myId={s.youId} />
+      )}
+
+      {/* Text chat panel — fixed bottom-right */}
+      {textChatEnabled && (
+        <TextChat
+          messages={textChat.messages}
+          onSend={textChat.send}
+          unreadCount={textChat.unreadCount}
+          onSetOpen={textChat.setOpen}
+        />
+      )}
     </>
   );
 }

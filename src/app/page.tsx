@@ -14,6 +14,8 @@ export default function Home() {
   const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [textChat, setTextChat] = useState(true);
+  const [voiceChat, setVoiceChat] = useState(false);
 
   async function startGame() {
     if (!name.trim() || busy) return;
@@ -21,6 +23,7 @@ export default function Home() {
     const res = await emitAck<CreateAck>("game:create", {
       gmName: name.trim(),
       gmEmoji: emoji,
+      settings: { textChat, voiceChat },
     });
     saveSession(res.code, {
       sessionToken: res.sessionToken,
@@ -94,6 +97,30 @@ export default function Home() {
             Pick your avatar
           </span>
           <EmojiPicker value={emoji} onChange={setEmoji} />
+          <div className="chat-toggles">
+            <label className="chat-toggle-row">
+              <span className="eyebrow">Text chat</span>
+              <button
+                type="button"
+                className={`toggle-btn${textChat ? " toggle-btn--on" : ""}`}
+                onClick={() => setTextChat((v) => !v)}
+                aria-pressed={textChat}
+              >
+                {textChat ? "On" : "Off"}
+              </button>
+            </label>
+            <label className="chat-toggle-row">
+              <span className="eyebrow">Voice chat</span>
+              <button
+                type="button"
+                className={`toggle-btn${voiceChat ? " toggle-btn--on" : ""}`}
+                onClick={() => setVoiceChat((v) => !v)}
+                aria-pressed={voiceChat}
+              >
+                {voiceChat ? "On" : "Off"}
+              </button>
+            </label>
+          </div>
           <button disabled={!name.trim() || busy} onClick={startGame}>
             {busy ? "Creating…" : "Start game"}
           </button>
