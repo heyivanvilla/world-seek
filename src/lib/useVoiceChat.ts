@@ -13,7 +13,7 @@ function buildIceServers(): RTCIceServer[] {
   if (url && username && credential) {
     return [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: url, username, credential },
+      { urls: [url, `${url}?transport=tcp`], username, credential },
     ];
   }
   // Open Relay Project — free public TURN, handles symmetric NAT.
