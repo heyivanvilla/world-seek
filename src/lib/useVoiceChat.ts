@@ -7,17 +7,30 @@ import { getSocket } from "./socket";
 export type VoiceMode = "always-on" | "push-to-talk" | "mute";
 
 function buildIceServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
-  // Optional TURN relay — required for symmetric NAT (common in mobile/corporate
-  // networks). Set these env vars to enable: NEXT_PUBLIC_TURN_URL,
-  // NEXT_PUBLIC_TURN_USERNAME, NEXT_PUBLIC_TURN_CREDENTIAL
   const url = process.env.NEXT_PUBLIC_TURN_URL;
   const username = process.env.NEXT_PUBLIC_TURN_USERNAME;
   const credential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
   if (url && username && credential) {
-    servers.push({ urls: url, username, credential });
+    return [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: url, username, credential },
+    ];
   }
-  return servers;
+  // Open Relay Project — free public TURN, handles symmetric NAT.
+  // Replace with private TURN via the env vars above for higher-traffic use.
+  return [
+    { urls: "stun:stun.l.google.com:19302" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+        "turn:openrelay.metered.ca:80?transport=tcp",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ];
 }
 const LS_VOICE_MODE = "ws-voice-mode";
 const LS_MIC_DEVICE = "ws-mic-device";
