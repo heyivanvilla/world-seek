@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SfxControl from "./SfxControl";
 
 interface Props {
   isGameMaster: boolean;
@@ -38,6 +39,9 @@ export default function GameMenu({ isGameMaster, onLeave, onClose }: Props) {
 
         {open && (
           <div className="game-menu-panel stack">
+            <div className="game-menu-row">
+              <SfxControl />
+            </div>
             <button
               className="ghost game-menu-item"
               onClick={() => {
@@ -55,7 +59,7 @@ export default function GameMenu({ isGameMaster, onLeave, onClose }: Props) {
         <div className="modal-backdrop" onClick={() => setConfirming(false)}>
           <div
             className="modal stack"
-            style={{ width: 400, gap: 18 }}
+            style={{ width: 600, gap: 18 }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -73,11 +77,15 @@ export default function GameMenu({ isGameMaster, onLeave, onClose }: Props) {
                 ? "This ends the game for everyone and sends all players back to the home page."
                 : "You'll go back to the home page. The other players keep playing."}
             </p>
-            <div className="row" style={{ gap: 10, justifyContent: "flex-end" }}>
-              <button className="secondary" onClick={() => setConfirming(false)}>
+            <div className="row" style={{ gap: 10, alignItems: "stretch" }}>
+              <button
+                className="secondary"
+                style={{ flex: 1 }}
+                onClick={() => setConfirming(false)}
+              >
                 Cancel
               </button>
-              <button onClick={isGameMaster ? onClose : onLeave}>
+              <button style={{ flex: 1 }} onClick={isGameMaster ? onClose : onLeave}>
                 {isGameMaster ? "Close game for everyone" : "Exit game"}
               </button>
             </div>

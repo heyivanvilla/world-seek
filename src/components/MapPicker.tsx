@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "@/lib/mapsLoader";
 import { EARTHY_MAP_STYLE } from "@/lib/mapStyle";
 import { createImageMarker, type ImageMarker } from "@/lib/ImageMarkerOverlay";
+import { playSfx } from "@/lib/sfx";
 import type { LatLng } from "@/shared/types";
 
 // The world-overview the guess map opens on (and returns to each new round).
@@ -74,6 +75,13 @@ export default function MapPicker({
   onDragRef.current = onDrag;
   const [ready, setReady] = useState(false);
 
+  // Committing the user's pin — a map click or a marker drag release — as
+  // opposed to onDrag, which streams continuously while still mid-drag.
+  function commitPin(p: LatLng, zoom: number) {
+    playSfx("/click-2.mp3");
+    onChangeRef.current?.(p, zoom);
+  }
+
   // --- init map once ---
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +93,7 @@ export default function MapPicker({
         minZoom: 2,
         // Color of the map div behind the tiles — visible in the void past the
         // edges of the world when zoomed out. Match the water tone so it blends.
-        backgroundColor: "#5c2a1a",
+        backgroundColor: "#3a4530",
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
@@ -97,10 +105,7 @@ export default function MapPicker({
       if (onChangeRef.current) {
         map.addListener("click", (e: google.maps.MapMouseEvent) => {
           if (e.latLng) {
-            onChangeRef.current?.(
-              { lat: e.latLng.lat(), lng: e.latLng.lng() },
-              map.getZoom() ?? 2,
-            );
+            commitPin({ lat: e.latLng.lat(), lng: e.latLng.lng() }, map.getZoom() ?? 2);
           }
         });
       }
@@ -164,7 +169,7 @@ export default function MapPicker({
           draggable: !!onChange,
           zIndex: 1000,
           onDrag: (p) => onDragRef.current?.(p, map.getZoom() ?? 2),
-          onDragEnd: (p) => onChangeRef.current?.(p, map.getZoom() ?? 2),
+          onDragEnd: (p) => commitPin(p, map.getZoom() ?? 2),
         });
         m.setMap(map);
         userMarkerRef.current = m;
@@ -173,10 +178,7 @@ export default function MapPicker({
         if (onChange) {
           m.addListener("dragend", (e: google.maps.MapMouseEvent) => {
             if (e.latLng) {
-              onChangeRef.current?.(
-                { lat: e.latLng.lat(), lng: e.latLng.lng() },
-                map.getZoom() ?? 2,
-              );
+              commitPin({ lat: e.latLng.lat(), lng: e.latLng.lng() }, map.getZoom() ?? 2);
             }
           });
         }

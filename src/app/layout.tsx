@@ -1,21 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Cutive_Mono } from "next/font/google";
+import { Jersey_25, Jersey_10 } from "next/font/google";
 import "./globals.css";
+import ClickSound from "@/components/ClickSound";
 
-// Editorial display serif — light weight / uppercase / tracking set in globals.css.
-const display = Cormorant_Garamond({
+// Pixel/arcade display — big stamped game-title headings. Single 400 weight.
+const display = Jersey_25({
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  variable: "--font-display",
+  weight: "400",
+  variable: "--ff-display",
   display: "swap",
 });
 
-// Typewriter monospace — used for body copy, eyebrows, UI labels, and buttons.
-// Cutive Mono ships a single 400 weight (no bold).
-const mono = Cutive_Mono({
+// Pixel/arcade display — used for body copy, eyebrows, UI labels, and buttons.
+// Jersey 10 ships a single 400 weight (no bold).
+const body = Jersey_10({
   subsets: ["latin"],
   weight: "400",
-  variable: "--font-mono",
+  variable: "--ff-mono",
   display: "swap",
 });
 
@@ -35,8 +36,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body>
+        {children}
+        <ClickSound />
+      </body>
     </html>
   );
 }

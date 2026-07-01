@@ -6,6 +6,7 @@ import { emitAck } from "@/lib/socket";
 import { saveSession } from "@/lib/session";
 import { DEFAULT_EMOJI } from "@/shared/emojis";
 import EmojiPicker from "@/components/EmojiPicker";
+import SfxControl from "@/components/SfxControl";
 import type { CreateAck } from "@/shared/types";
 
 export default function Home() {
@@ -14,8 +15,9 @@ export default function Home() {
   const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [textChat, setTextChat] = useState(true);
+  const [textChat, setTextChat] = useState(false);
   const [voiceChat, setVoiceChat] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function startGame() {
     if (!name.trim() || busy) return;
@@ -75,17 +77,19 @@ export default function Home() {
       <div className="bg-texture" aria-hidden="true" />
       <div className="stack" style={{ width: 380, gap: 24, position: "relative", zIndex: 1 }}>
         <div className="stack" style={{ gap: 10, textAlign: "center" }}>
-          <span className="eyebrow">Open World · Street View</span>
-          <h1 className="title" style={{ fontSize: 46 }}>
+          <span className="eyebrow" style={{ fontSize: 18 }}>
+            Open World · Street View
+          </span>
+          <h1 className="title" style={{ fontSize: 64 }}>
             World Seek
           </h1>
-          <p className="muted" style={{ margin: 0 }}>
+          <p className="pullquote" style={{ margin: 0, fontSize: 18, color: "var(--text-dim)" }}>
             Hide somewhere in the world. Let your friends find you on Street View.
           </p>
         </div>
 
         <div className="card stack">
-          <span className="eyebrow">#1 Start a new game</span>
+          <span className="eyebrow"><span className="section-number">§01</span>Start a new game</span>
           <input
             placeholder="Your name"
             value={name}
@@ -98,41 +102,82 @@ export default function Home() {
             data-lpignore="true"
             data-bwignore
           />
-          <span className="muted" style={{ fontSize: 13 }}>
+          <span className="muted" style={{ fontSize: 23 }}>
             Pick your avatar
           </span>
           <EmojiPicker value={emoji} onChange={setEmoji} />
-          <div className="chat-toggles">
-            <label className="chat-toggle-row">
-              <span className="eyebrow">Text chat</span>
-              <button
-                type="button"
-                className={`toggle-btn${textChat ? " toggle-btn--on" : ""}`}
-                onClick={() => setTextChat((v) => !v)}
-                aria-pressed={textChat}
-              >
-                {textChat ? "On" : "Off"}
-              </button>
-            </label>
-            <label className="chat-toggle-row">
-              <span className="eyebrow">Voice chat</span>
-              <button
-                type="button"
-                className={`toggle-btn${voiceChat ? " toggle-btn--on" : ""}`}
-                onClick={() => setVoiceChat((v) => !v)}
-                aria-pressed={voiceChat}
-              >
-                {voiceChat ? "On" : "Off"}
-              </button>
-            </label>
-          </div>
+          <button type="button" className="secondary" onClick={() => setSettingsOpen(true)}>
+            Settings
+          </button>
           <button disabled={!name.trim() || busy} onClick={startGame}>
             {busy ? "Creating…" : "Start game"}
           </button>
         </div>
 
+        {settingsOpen && (
+          <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
+            <div
+              className="modal stack"
+              style={{ width: 420, gap: 20 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="ghost modal-x"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+              <h2 className="title" style={{ fontSize: 22 }}>
+                Settings
+              </h2>
+
+              <div className="stack" style={{ gap: 10 }}>
+                <span className="eyebrow">Game settings</span>
+                <div className="chat-toggles">
+                  <label className="chat-toggle-row">
+                    <span className="eyebrow">Text chat</span>
+                    <button
+                      type="button"
+                      className={`toggle-btn${textChat ? " toggle-btn--on" : ""}`}
+                      onClick={() => setTextChat((v) => !v)}
+                      aria-pressed={textChat}
+                    >
+                      {textChat ? "On" : "Off"}
+                    </button>
+                  </label>
+                  <label className="chat-toggle-row">
+                    <span className="eyebrow">Voice chat</span>
+                    <button
+                      type="button"
+                      className={`toggle-btn${voiceChat ? " toggle-btn--on" : ""}`}
+                      onClick={() => setVoiceChat((v) => !v)}
+                      aria-pressed={voiceChat}
+                    >
+                      {voiceChat ? "On" : "Off"}
+                    </button>
+                  </label>
+                </div>
+              </div>
+
+              <div className="settings-divider" />
+
+              <div className="stack" style={{ gap: 10 }}>
+                <span className="eyebrow">Your settings</span>
+                <SfxControl />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button className="secondary" onClick={() => setSettingsOpen(false)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="card stack">
-          <span className="eyebrow">#2 Join with a code</span>
+          <span className="eyebrow"><span className="section-number">§02</span>Join with a code</span>
           <input
             placeholder="e.g. abr-tyr"
             value={code}
@@ -144,6 +189,21 @@ export default function Home() {
             Join game
           </button>
         </div>
+
+        <p className="muted" style={{ textAlign: "center", fontSize: 13, margin: 0 }}>
+          Created by{" "}
+          <a href="https://ivanvilla.com" target="_blank" rel="noopener noreferrer">
+            Ivan Villa
+          </a>
+          {" · "}
+          <a
+            href="https://github.com/heyivanvilla/world-seek"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            source code on GitHub
+          </a>
+        </p>
       </div>
     </div>
   );
