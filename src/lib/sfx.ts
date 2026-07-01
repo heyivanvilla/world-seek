@@ -41,13 +41,52 @@ export function setSfxVolume(volume: number): void {
   } catch {}
 }
 
-// One shared <audio> element per sound effect, reused across plays instead of
-// allocating a new one each time.
+// Web Audio API playback: sounds are fetched + decoded into an in-memory
+// AudioBuffer once, then played via a fresh AudioBufferSourceNode each time.
+// This avoids the per-play latency HTMLAudioElement.play() has on mobile,
+// where the OS has to wake/re-init the audio session on every call.
+let audioCtx: AudioContext | null = null;
+
+function getAudioCtx(): AudioContext | null {
+  if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") void audioCtx.resume();
+  return audioCtx;
+}
+
+const bufferCache = new Map<string, AudioBuffer>();
+const bufferLoading = new Map<string, Promise<AudioBuffer | null>>();
+
+function loadBuffer(ctx: AudioContext, src: string): Promise<AudioBuffer | null> {
+  const cached = bufferCache.get(src);
+  if (cached) return Promise.resolve(cached);
+  let loading = bufferLoading.get(src);
+  if (!loading) {
+    loading = fetch(src)
+      .then((res) => res.arrayBuffer())
+      .then((data) => ctx.decodeAudioData(data))
+      .then((buf) => {
+        bufferCache.set(src, buf);
+        return buf;
+      })
+      .catch(() => null);
+    bufferLoading.set(src, loading);
+  }
+  return loading;
+}
+
+/** Fetches + decodes a sound effect ahead of time so the first play is instant. */
+export function preloadSfx(src: string): void {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  void loadBuffer(ctx, src);
+}
+
+// Fallback path (Web Audio unavailable, or buffer not decoded yet) — one
+// shared <audio> element per sound effect, reused across plays.
 const audioCache = new Map<string, HTMLAudioElement>();
 
-/** Plays a sound effect from /public, respecting the enabled + volume settings. */
-export function playSfx(src: string): void {
-  if (!isSfxEnabled()) return;
+function playFallback(src: string): void {
   let audio = audioCache.get(src);
   if (!audio) {
     audio = new Audio(src);
@@ -56,4 +95,28 @@ export function playSfx(src: string): void {
   audio.currentTime = 0;
   audio.volume = getSfxVolume();
   audio.play().catch(() => {});
+}
+
+/** Plays a sound effect from /public, respecting the enabled + volume settings. */
+export function playSfx(src: string): void {
+  if (!isSfxEnabled()) return;
+  const ctx = getAudioCtx();
+  if (!ctx) {
+    playFallback(src);
+    return;
+  }
+  const buffer = bufferCache.get(src);
+  if (!buffer) {
+    // Not decoded yet — play the fallback for this call and let the
+    // now-in-flight decode populate the cache for subsequent plays.
+    void loadBuffer(ctx, src);
+    playFallback(src);
+    return;
+  }
+  const gain = ctx.createGain();
+  gain.gain.value = getSfxVolume();
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(gain).connect(ctx.destination);
+  source.start(0);
 }
