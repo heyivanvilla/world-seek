@@ -96,6 +96,7 @@ export default function GameRoom({ code }: { code: string }) {
           onSend={textChat.send}
           unreadCount={textChat.unreadCount}
           onSetOpen={textChat.setOpen}
+          hasVoice={voiceChatEnabled}
         />
       )}
     </>

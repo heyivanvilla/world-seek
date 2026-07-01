@@ -9,9 +9,10 @@ interface Props {
   onSend: (text: string) => void;
   unreadCount: number;
   onSetOpen: (open: boolean) => void;
+  hasVoice: boolean;
 }
 
-export default function TextChat({ messages, onSend, unreadCount, onSetOpen }: Props) {
+export default function TextChat({ messages, onSend, unreadCount, onSetOpen, hasVoice }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -20,6 +21,15 @@ export default function TextChat({ messages, onSend, unreadCount, onSetOpen }: P
   useEffect(() => {
     onSetOpen(open);
   }, [open, onSetOpen]);
+
+  // On desktop (see the min-width:561px rules in globals.css) this class turns
+  // the chat panel into a full-height sidebar docked over the right edge of
+  // the game (and hides the now-redundant toggle button). On mobile the class
+  // has no effect, so the panel stays the original floating dropdown.
+  useEffect(() => {
+    document.body.classList.toggle("chat-open", open);
+    return () => document.body.classList.remove("chat-open");
+  }, [open]);
 
   // Auto-scroll to the newest message whenever the list grows.
   useEffect(() => {
@@ -52,7 +62,7 @@ export default function TextChat({ messages, onSend, unreadCount, onSetOpen }: P
   }
 
   return (
-    <div className="chat-container">
+    <div className={`chat-container${hasVoice ? "" : " chat-container--solo"}`}>
       {/* Toggle button at the top; panel drops down below it */}
       <button
         className={`chat-toggle secondary${unreadCount > 0 && !open ? " chat-toggle--unread" : ""}`}
@@ -68,6 +78,19 @@ export default function TextChat({ messages, onSend, unreadCount, onSetOpen }: P
 
       {open && (
         <div className="chat-panel">
+          {/* Only shown when docked as a desktop sidebar — the toggle button
+              above is hidden then, so this is the only way to close it. */}
+          <div className="chat-panel-header">
+            <span className="eyebrow">Chat</span>
+            <button
+              className="ghost modal-x"
+              style={{ position: "static" }}
+              onClick={toggle}
+              aria-label="Close chat"
+            >
+              ✕
+            </button>
+          </div>
           <div className="chat-messages">
             {messages.length === 0 && (
               <p className="chat-empty muted">No messages yet.</p>
