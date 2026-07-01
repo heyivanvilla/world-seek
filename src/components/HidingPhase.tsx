@@ -217,7 +217,7 @@ export default function HidingPhase({ state, onHide, speakingIds }: Props) {
             </ul>
             <div className="card stack" style={{ gap: 8 }}>
               <span className="eyebrow">You set the difficulty 🎚️</span>
-              <ul className="modal-list muted" style={{ fontSize: 13 }}>
+              <ul className="modal-list muted" style={{ fontSize: 23 }}>
                 <li>Hide by street signs, addresses or car plates to leave clues</li>
                 <li>Pick somewhere blank to send everyone wandering</li>
               </ul>

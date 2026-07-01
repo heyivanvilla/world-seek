@@ -55,7 +55,7 @@ export default function Lobby({ state, onStart, speakingIds }: Props) {
               {isSolo ? "Play solo" : "Start game"}
             </button>
             {isSolo && (
-              <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+              <p className="muted" style={{ margin: 0, fontSize: 23 }}>
                 No one else here — you'll guess random spots the game picks. Invite
                 someone to play head-to-head instead.
               </p>

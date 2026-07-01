@@ -201,7 +201,7 @@ function WatchView({
       <div className="map-wrap">
         <div className="overlay-top">
           <strong>{title}</strong>
-          <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+          <div className="muted" style={{ fontSize: 23, marginTop: 2 }}>
             {roundLabel} · pins glow solid when locked in
           </div>
         </div>

@@ -92,7 +92,7 @@ export default function VoiceSettings({
 
         {micError && (
           <div className="voice-error">
-            <span className="muted" style={{ fontSize: 13 }}>
+            <span className="muted" style={{ fontSize: 23 }}>
               {micError}
             </span>
           </div>
@@ -102,11 +102,11 @@ export default function VoiceSettings({
         <div className="stack" style={{ gap: 8 }}>
           <span className="eyebrow">Microphone</span>
           {!devicesLoaded ? (
-            <span className="muted" style={{ fontSize: 13 }}>
+            <span className="muted" style={{ fontSize: 23 }}>
               Loading…
             </span>
           ) : devices.length === 0 ? (
-            <span className="muted" style={{ fontSize: 13 }}>
+            <span className="muted" style={{ fontSize: 23 }}>
               No microphones found.
             </span>
           ) : (
@@ -131,7 +131,7 @@ export default function VoiceSettings({
             <div ref={meterRef} className="vol-meter-fill" />
           </div>
           {!micReady && (
-            <span className="muted" style={{ fontSize: 12 }}>
+            <span className="muted" style={{ fontSize: 21 }}>
               {micError ? "Mic unavailable" : "Requesting mic access…"}
             </span>
           )}
@@ -148,7 +148,7 @@ export default function VoiceSettings({
                 onClick={() => onSetVoiceMode(m.value)}
               >
                 <strong>{m.label}</strong>
-                <span className="muted" style={{ fontSize: 11 }}>
+                <span className="muted" style={{ fontSize: 20 }}>
                   {m.desc}
                 </span>
               </button>

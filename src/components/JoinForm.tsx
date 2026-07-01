@@ -65,7 +65,7 @@ export default function JoinForm({ code, error, onJoin, onPeek }: Props) {
           data-lpignore="true"
           data-bwignore
         />
-        <span className="muted" style={{ fontSize: 13 }}>
+        <span className="muted" style={{ fontSize: 23 }}>
           Pick your avatar
         </span>
         <EmojiPicker value={emoji} onChange={setEmoji} taken={taken} />
