@@ -14,6 +14,11 @@ player is hiding using Google Street View. 🏆 Points are awarded by distance �
   single source of truth (clients send intents; the server runs the game and pushes a
   redacted per-player state)
 - 🗺️ **Google Maps + Street View** for hiding and guessing
+- 💬 **Text chat** over Socket.IO, scoped per game
+- 🎙️ **Live voice chat** over peer-to-peer **WebRTC** (mesh of direct connections between
+  players) — always-on, push-to-talk, or mute, with a mic device picker and a speaking
+  indicator. Socket.IO only carries signaling (offers/answers/ICE candidates); audio never
+  touches the server
 
 ## ✅ Prerequisites
 
@@ -128,12 +133,35 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-key docker compose up --build
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | **build** | ✅ | Maps + Street View; inlined into the client bundle |
 | `ALLOWED_ORIGIN` | runtime | prod | Your `https://…` origin; locks Socket.IO CORS |
 | `PORT` | runtime | — | Listen port (defaults to `3000`) |
+| `NEXT_PUBLIC_TURN_URL` | **build** | — | Your own TURN server URL (e.g. `turn:turn.yourdomain.com:3478`); see [Voice chat & TURN](#-voice-chat--turn) below |
+| `NEXT_PUBLIC_TURN_USERNAME` | **build** | — | TURN credential username, paired with `NEXT_PUBLIC_TURN_URL` |
+| `NEXT_PUBLIC_TURN_CREDENTIAL` | **build** | — | TURN credential password, paired with `NEXT_PUBLIC_TURN_URL` |
 
-> ### 🚦 Run exactly one instance
-> Game state is held **in memory**, so World Seek does **not** scale horizontally. Keep
-> **replicas = 1** (no autoscaling / load-balanced multi-instance) — a second instance would
-> split rooms and break Socket.IO reconnections. Put a reverse proxy (Caddy, Traefik, nginx) in
-> front for HTTPS; make sure it forwards WebSocket upgrades so `wss://` works.
+### 🎙️ Voice chat & TURN
+
+Voice is peer-to-peer WebRTC, so two players behind certain routers/NATs (symmetric NAT,
+some hotel/corporate Wi-Fi) can't connect directly — they need a **TURN** server to relay
+audio. If you leave `NEXT_PUBLIC_TURN_*` unset, World Seek falls back to the free
+[Open Relay Project](https://www.metered.ca/tools/openrelay/) public TURN server, which is
+fine for trying things out but is shared, rate-limited, and not something to depend on for a
+real deployment. For anything beyond casual local play, run your own TURN server (e.g.
+[coturn](https://github.com/coturn/coturn)) and set the three `NEXT_PUBLIC_TURN_*` build args
+above. Like the Maps key, these are `NEXT_PUBLIC_` and inlined into the client bundle, so set
+them at **build time**.
+
+> ### 🚦 Keep it to one instance
+> All your games live in the server's memory, like notes on a whiteboard — there's no separate
+> database backing it up. That's totally fine for friends playing together, but it means:
+>
+> - **Don't turn on autoscaling / multiple replicas.** If your host spins up a second copy of
+>   the server, it's a second blank whiteboard — some players could get routed to a copy that's
+>   never heard of your game and get bumped out. Just run **one** instance.
+> - **A restart wipes active games.** If the server reboots or redeploys mid-game, that
+>   whiteboard gets wiped — everyone would need to start a fresh game. No big deal for casual
+>   play, just don't expect it to survive a deploy.
+>
+> Also put a reverse proxy (Caddy, Traefik, nginx) in front for HTTPS, and make sure it allows
+> WebSocket upgrades — that's what keeps everyone's connection (and voice/text chat) alive.
 
 ### On a PaaS (Coolify, Render, Railway, …)
 
@@ -159,6 +187,15 @@ you. Keep it to a single instance.
 6. 🎊 **Results:** the real spot, all guesses, and points are revealed. Host advances.
 7. 🥇 After the last round, final scores + winner. Host can return everyone to the lobby.
 
+### 💬🎙️ Chat & voice
+
+- The host toggles **text chat** and **voice chat** on or off per game when creating it.
+- Text chat is a shared room thread (open it from the in-game chat panel) with per-game
+  history sent to anyone who (re)joins.
+- Voice chat connects every player directly to every other player (mesh WebRTC) — no audio
+  passes through the server. Pick **always-on**, **push-to-talk** (hold Space), or **mute**,
+  and choose your mic from the device picker in voice settings.
+
 ### 🔄 Reconnection & join-locking
 
 - A session token is stored in `localStorage` per game. Refresh or reconnect mid-game and you
@@ -172,8 +209,10 @@ you. Keep it to a single instance.
 server/                 custom Node server (Next + Socket.IO) and event handlers
 src/shared/             types, scoring (haversine + decay), code/token generation — shared
 src/server-logic/       in-memory store, state-machine transitions, per-player projection
-src/lib/                client socket, session storage, useGame hook, Google Maps loader
-src/components/         MapPicker, StreetView, and the phase screens
+src/lib/                client socket, session storage, useGame hook, Google Maps loader,
+                        useTextChat / useVoiceChat hooks
+src/components/         MapPicker, StreetView, the phase screens, TextChat, VoiceChat,
+                        VoiceSettings
 src/app/                home page + /game/[code] room shell
 scripts/smoke.mjs       headless end-to-end test of the full game loop (server must be running)
 ```
