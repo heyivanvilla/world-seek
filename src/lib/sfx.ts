@@ -1,6 +1,6 @@
 const LS_ENABLED_KEY = "ws-sfx-enabled";
 const LS_VOLUME_KEY = "ws-sfx-volume";
-const DEFAULT_VOLUME = 0.1;
+const DEFAULT_VOLUME = 0.2;
 
 export interface SfxSettings {
   enabled: boolean;
