@@ -6,8 +6,8 @@ import { emojiUrl } from "@/shared/emojis";
 import MapPicker, { type MapLine, type MapMarker } from "./MapPicker";
 
 const PALETTE = [
-  "#6c7bff", "#3ddc97", "#ffcc66", "#ff6b6b", "#c084fc", "#22d3ee",
-  "#f472b6", "#a3e635", "#fb923c", "#60a5fa", "#f87171", "#34d399",
+  "#4a5d2f", "#9a3324", "#c8843d", "#3a5a6e", "#7d5a3a", "#5e7540",
+  "#a8553d", "#2f4858", "#b8862f", "#6b4226", "#436b56", "#8c3d2e",
 ];
 
 interface Props {
@@ -33,9 +33,13 @@ export default function ResultsPhase({ state, onNext }: Props) {
     {
       lat: result.real.lat,
       lng: result.real.lng,
-      icon: result.targetEmoji,
+      // Solo has no real opponent — the "target" is just DEFAULT_EMOJI, which
+      // is also whatever avatar the player left selected, so an emoji marker
+      // here reads as "guessing against yourself". A plain map pin instead
+      // reads as what it actually is: the spot, not a player.
+      icon: state.solo ? undefined : result.targetEmoji,
       size: 54, // hider's real spot, rendered larger
-      title: `${result.targetName}'s real hiding spot`,
+      title: state.solo ? "The real spot" : `${result.targetName}'s real hiding spot`,
     },
     ...result.guesses.map((g) => ({
       lat: g.lat,
